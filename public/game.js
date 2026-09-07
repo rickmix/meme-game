@@ -85,8 +85,27 @@ function pointsFor(sec) {
 // SINGLE PLAYER - NEW ROUND
 // ============================================================
 
+function stopSinglePlayerAudio() {
+    // Stop the main game audio
+    audio.pause();
+    audio.currentTime = 0;
+    audio.removeAttribute("src");
+    audio.load();
+
+    // Stop the result/replay audio
+    clipAudio.pause();
+    clipAudio.currentTime = 0;
+    clipAudio.removeAttribute("src");
+    clipAudio.load();
+
+    clipAudio.classList.add("hidden");
+}
+
 async function newRound() {
     $("#setupError").textContent = "";
+
+    // Stop any audio from the previous round
+    stopSinglePlayerAudio();
 
     const response = await fetch("/api/game");
     const data = await response.json();
@@ -276,6 +295,9 @@ function guess(id) {
 // ============================================================
 
 function playClip() {
+    clipAudio.pause();
+    clipAudio.currentTime = 0;
+
     audio.currentTime = 0;
 
     audio.play().catch(() => {});
