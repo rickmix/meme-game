@@ -1,58 +1,150 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
   <title>Guess the Video</title>
-  <link rel="stylesheet" href="/style.css">
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
 
 <body>
-  <main class="app">
 
-    <header>
-      <div>
-        <div class="eyebrow">AUDIO QUIZ</div>
-        <h1>Guess the video</h1>
+<main class="app">
+
+  <!-- HEADER -->
+  <header>
+
+    <div>
+      <div class="eyebrow">
+        AUDIO QUIZ
       </div>
 
-      <a class="admin-link" href="/admin.html">Admin</a>
-    </header>
+      <h1>
+        Guess the video
+      </h1>
+    </div>
 
-    <section id="setup" class="card">
-      <h2>Ready?</h2>
+    <a
+      class="admin-link"
+      href="/admin.html"
+    >
+      Admin
+    </a>
+
+  </header>
+
+
+  <!-- MODE TABS -->
+  <div class="tabs">
+
+    <button
+      id="singleTab"
+      class="tab active"
+      type="button"
+    >
+      Single Player
+    </button>
+
+    <button
+      id="multiTab"
+      class="tab"
+      type="button"
+    >
+      Multiplayer
+    </button>
+
+  </div>
+
+
+  <!-- ======================================================
+       SINGLE PLAYER
+       ====================================================== -->
+
+  <section
+    id="singlePlayer"
+  >
+
+    <!-- SETUP -->
+    <section
+      id="setup"
+      class="card"
+    >
+
+      <h2>
+        Ready?
+      </h2>
 
       <p>
-        Listen to a tiny piece of a random video and identify it.
+        Listen to a tiny piece of a random video
+        and identify it.
       </p>
 
-      <button id="startBtn" class="primary">
+      <button
+        id="startBtn"
+        class="primary"
+        type="button"
+      >
         Start game
       </button>
 
-      <p id="setupError" class="error"></p>
+      <p
+        id="setupError"
+        class="error"
+      ></p>
+
     </section>
 
-    <section id="game" class="hidden">
 
-      <div class="stats">
+    <!-- GAME -->
+    <section
+      id="game"
+      class="hidden"
+    >
+
+      <div class="stats single-stats">
 
         <div>
-          <span>Score</span>
-          <strong id="score">0</strong>
+          <span>
+            Score
+          </span>
+
+          <strong id="score">
+            0
+          </strong>
         </div>
 
         <div>
-          <span>Clip</span>
-          <strong id="clipTime">0.3s</strong>
+          <span>
+            Clip
+          </span>
+
+          <strong id="clipTime">
+            0.3s
+          </strong>
         </div>
 
         <div>
-          <span>Round</span>
-          <strong id="round">1</strong>
+          <span>
+            Round
+          </span>
+
+          <strong id="round">
+            1
+          </strong>
         </div>
 
       </div>
+
 
       <div class="card game-card">
 
@@ -65,13 +157,17 @@
         </h2>
 
         <p class="muted">
-          Listen again to reveal more. The longer you listen, the fewer points you get.
+          Listen again to reveal more.
+          The longer you listen, the fewer
+          points you get.
         </p>
+
 
         <audio
           id="audio"
           preload="auto"
         ></audio>
+
 
         <div class="player">
 
@@ -84,14 +180,21 @@
           </button>
 
           <div class="bar">
-            <div id="progress"></div>
+
+            <div
+              id="progress"
+            ></div>
+
           </div>
 
-          <span id="durationLabel">
+          <span
+            id="durationLabel"
+          >
             0.3s
           </span>
 
         </div>
+
 
         <div class="answer-box">
 
@@ -100,7 +203,7 @@
             type="text"
             placeholder="Type the video title..."
             autocomplete="off"
-          />
+          >
 
           <div
             id="suggestions"
@@ -108,6 +211,7 @@
           ></div>
 
         </div>
+
 
         <button
           id="submitAnswer"
@@ -117,6 +221,7 @@
           Submit answer
         </button>
 
+
         <button
           id="dontKnow"
           class="secondary"
@@ -125,10 +230,12 @@
           I don't know — reveal more
         </button>
 
+
         <div
           id="result"
           class="result hidden"
         ></div>
+
 
         <audio
           id="clipAudio"
@@ -140,8 +247,437 @@
 
     </section>
 
-  </main>
+  </section>
 
-  <script src="/game.js"></script>
+
+  <!-- ======================================================
+       MULTIPLAYER
+       ====================================================== -->
+
+  <section
+    id="multiplayer"
+    class="hidden"
+  >
+
+    <!-- MULTIPLAYER SETUP -->
+    <section
+      id="multiSetup"
+      class="card"
+    >
+
+      <h2>
+        Multiplayer
+      </h2>
+
+      <p class="muted">
+        Create a party or join your friends
+        using a party code.
+      </p>
+
+
+      <div class="multi-actions">
+
+        <!-- CREATE -->
+        <div class="multi-box">
+
+          <h3>
+            Create party
+          </h3>
+
+          <input
+            id="createName"
+            type="text"
+            maxlength="20"
+            placeholder="Your name"
+          >
+
+          <select
+            id="roundCount"
+            class="multi-select"
+          >
+
+            <option value="5">
+              5 rounds
+            </option>
+
+            <option
+              value="10"
+              selected
+            >
+              10 rounds
+            </option>
+
+            <option value="15">
+              15 rounds
+            </option>
+
+            <option value="20">
+              20 rounds
+            </option>
+
+          </select>
+
+          <button
+            id="createPartyBtn"
+            class="primary"
+            type="button"
+          >
+            Create party
+          </button>
+
+        </div>
+
+
+        <div class="multi-divider">
+          OR
+        </div>
+
+
+        <!-- JOIN -->
+        <div class="multi-box">
+
+          <h3>
+            Join party
+          </h3>
+
+          <input
+            id="joinName"
+            type="text"
+            maxlength="20"
+            placeholder="Your name"
+          >
+
+          <input
+            id="partyCodeInput"
+            type="text"
+            maxlength="5"
+            placeholder="Party code"
+            style="text-transform: uppercase;"
+          >
+
+          <button
+            id="joinPartyBtn"
+            class="primary"
+            type="button"
+          >
+            Join party
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <p
+        id="multiSetupError"
+        class="error"
+      ></p>
+
+    </section>
+
+
+    <!-- ====================================================
+         LOBBY
+         ==================================================== -->
+
+    <section
+      id="multiLobby"
+      class="card hidden"
+    >
+
+      <div class="lobby-header">
+
+        <div>
+
+          <div class="eyebrow">
+            PARTY CODE
+          </div>
+
+          <div
+            id="partyCode"
+            class="party-code"
+          >
+            ABCDE
+          </div>
+
+        </div>
+
+        <button
+          id="leavePartyBtn"
+          class="secondary"
+          type="button"
+        >
+          Leave
+        </button>
+
+      </div>
+
+
+      <h2>
+        Waiting for players
+      </h2>
+
+      <p
+        id="lobbyRounds"
+        class="muted"
+      >
+        10 rounds
+      </p>
+
+
+      <div
+        id="playerList"
+        class="player-list"
+      ></div>
+
+
+      <button
+        id="startPartyBtn"
+        class="primary"
+        type="button"
+      >
+        Start game
+      </button>
+
+
+      <p
+        id="lobbyHint"
+        class="muted lobby-hint"
+      >
+        Share the party code with your friends.
+      </p>
+
+    </section>
+
+
+    <!-- ====================================================
+         MULTIPLAYER GAME
+         ==================================================== -->
+
+    <section
+      id="multiGame"
+      class="hidden"
+    >
+
+      <!-- ROUND PROGRESS -->
+      <div class="multi-round-header">
+
+        <div class="multi-round-label">
+
+          <span
+            id="multiRoundCurrent"
+            class="multi-round-current"
+          >
+            1
+          </span>
+
+          <span
+            class="multi-round-total"
+          >
+            / 10
+          </span>
+
+        </div>
+
+        <div class="multi-round-progress">
+
+          <div
+            id="multiRoundProgress"
+            class="multi-round-progress-bar"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div class="stats">
+
+        <div>
+          <span>
+            Score
+          </span>
+
+          <strong id="multiScore">
+            0
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Players
+          </span>
+
+          <strong id="multiPlayerCount">
+            0
+          </strong>
+        </div>
+
+      </div>
+
+
+      <div class="card game-card">
+
+        <div class="sound-icon">
+          ♫
+        </div>
+
+
+        <h2>
+          What video is this?
+        </h2>
+
+
+        <p class="muted">
+          Everyone hears the same clip.
+          Choose your answer as quickly as possible.
+        </p>
+
+
+        <audio
+          id="multiAudio"
+          preload="auto"
+        ></audio>
+
+
+        <div class="player">
+
+          <button
+            id="multiPlayBtn"
+            class="play"
+            type="button"
+          >
+            ▶
+          </button>
+
+          <div class="bar">
+
+            <div
+              id="multiProgress"
+            ></div>
+
+          </div>
+
+          <span
+            id="multiDuration"
+          >
+            20s
+          </span>
+
+        </div>
+
+
+        <!-- ANSWER CHOICES -->
+        <div
+          id="multiChoices"
+          class="multi-choices"
+        ></div>
+
+
+        <div
+          id="multiAnswerStatus"
+          class="answer-status hidden"
+        ></div>
+
+
+        <h3
+          class="score-title"
+        >
+          Live scoreboard
+        </h3>
+
+
+        <div
+          id="multiScoreboard"
+          class="scoreboard"
+        ></div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ====================================================
+         ROUND RESULT
+         ==================================================== -->
+
+    <section
+      id="multiRoundResult"
+      class="card game-card hidden"
+    >
+
+      <div class="sound-icon">
+        ✓
+      </div>
+
+      <h2>
+        Round complete
+      </h2>
+
+      <p
+        id="roundAnswer"
+        class="muted"
+      >
+        Answer
+      </p>
+
+
+      <div
+        id="roundResults"
+        class="round-results"
+      ></div>
+
+    </section>
+
+
+    <!-- ====================================================
+         FINAL RESULT
+         ==================================================== -->
+
+    <section
+      id="multiFinalResult"
+      class="card game-card hidden"
+    >
+
+      <div class="sound-icon">
+        🏆
+      </div>
+
+      <h2>
+        Game finished!
+      </h2>
+
+      <p class="muted">
+        Final scoreboard
+      </p>
+
+
+      <div
+        id="finalScoreboard"
+        class="scoreboard"
+      ></div>
+
+
+      <button
+        id="finalLeaveBtn"
+        class="primary"
+        type="button"
+      >
+        Leave party
+      </button>
+
+    </section>
+
+  </section>
+
+</main>
+
+
+<!-- Socket.IO -->
+<script src="/socket.io/socket.io.js"></script>
+
+<!-- Game -->
+<script src="/game.js"></script>
+
 </body>
 </html>
