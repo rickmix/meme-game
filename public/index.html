@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guess the Video</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <main class="app">
+
+    <header>
+      <div>
+        <div class="eyebrow">AUDIO QUIZ</div>
+        <h1>Guess the video</h1>
+      </div>
+
+      <a class="admin-link" href="/admin.html">Admin</a>
+    </header>
+
+    <section id="setup" class="card">
+      <h2>Ready?</h2>
+
+      <p>
+        Listen to a tiny piece of a random video and identify it.
+      </p>
+
+      <button id="startBtn" class="primary">
+        Start game
+      </button>
+
+      <p id="setupError" class="error"></p>
+    </section>
+
+    <section id="game" class="hidden">
+
+      <div class="stats">
+
+        <div>
+          <span>Score</span>
+          <strong id="score">0</strong>
+        </div>
+
+        <div>
+          <span>Clip</span>
+          <strong id="clipTime">0.3s</strong>
+        </div>
+
+        <div>
+          <span>Round</span>
+          <strong id="round">1</strong>
+        </div>
+
+      </div>
+
+      <div class="card game-card">
+
+        <div class="sound-icon">
+          ♫
+        </div>
+
+        <h2>
+          What video is this?
+        </h2>
+
+        <p class="muted">
+          Listen again to reveal more. The longer you listen, the fewer points you get.
+        </p>
+
+        <audio
+          id="audio"
+          preload="auto"
+        ></audio>
+
+        <div class="player">
+
+          <button
+            id="playBtn"
+            class="play"
+            type="button"
+          >
+            ▶
+          </button>
+
+          <div class="bar">
+            <div id="progress"></div>
+          </div>
+
+          <span id="durationLabel">
+            0.3s
+          </span>
+
+        </div>
+
+        <div class="answer-box">
+
+          <input
+            id="answerInput"
+            type="text"
+            placeholder="Type the video title..."
+            autocomplete="off"
+          />
+
+          <div
+            id="suggestions"
+            class="suggestions"
+          ></div>
+
+        </div>
+
+        <button
+          id="submitAnswer"
+          class="primary"
+          type="button"
+        >
+          Submit answer
+        </button>
+
+        <button
+          id="dontKnow"
+          class="secondary"
+          type="button"
+        >
+          I don't know — reveal more
+        </button>
+
+        <div
+          id="result"
+          class="result hidden"
+        ></div>
+
+        <audio
+          id="clipAudio"
+          controls
+          class="clip-audio hidden"
+        ></audio>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="/game.js"></script>
+</body>
+</html>

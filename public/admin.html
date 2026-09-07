@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guess Game — Admin</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main class="app">
+  <header>
+    <div>
+      <div class="eyebrow">ADMIN</div>
+      <h1>Video library</h1>
+    </div>
+    <a class="admin-link" href="/">← Game</a>
+  </header>
+
+  <section class="card">
+    <h2>Add a YouTube video</h2>
+    <p class="muted">The server downloads the audio, detects silence, and picks a random audible section.</p>
+    <form id="addForm">
+      <textarea
+        id="url"
+        required
+        rows="4"
+        placeholder="Paste YouTube URLs separated by commas&#10;&#10;https://www.youtube.com/watch?v=abc123, https://youtu.be/xyz456"
+      ></textarea>
+      <button class="primary">Add & process</button>
+    </form>
+    <p id="message"></p>
+  </section>
+
+  <section class="card">
+    <div class="library-head">
+      <h2>Your videos</h2>
+      <button id="refresh" class="secondary">Refresh</button>
+    </div>
+    <div id="list"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+
+async function load() {
+  const r = await fetch("/api/videos");
+  const videos = await r.json();
+  $("#list").innerHTML = videos.length ? videos.map(v => `
+    <div class="video-row">
+      <div>
+        <strong>${escapeHtml(v.title)}</strong>
+        <small>${escapeHtml(v.channel || "")} · ${v.ready ? "✓ Ready" : "Processing…"}</small>
+      </div>
+      <button class="danger" onclick="removeVideo('${v.id}')">Delete</button>
+    </div>
+  `).join("") : '<p class="muted">No videos yet.</p>';
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+async function removeVideo(id) {
+  if (!confirm("Delete this video?")) return;
+  await fetch("/api/videos/" + id, {method:"DELETE"});
+  load();
+}
+$("#addForm").onsubmit = async e => {
+  e.preventDefault();
+
+  const urls = $("#url").value
+    .split(",")
+    .map(url => url.trim())
+    .filter(Boolean);
+
+  if (!urls.length) {
+    $("#message").textContent = "Please enter at least one YouTube URL.";
+    return;
+  }
+
+  $("#message").textContent =
+    `Processing ${urls.length} video${urls.length === 1 ? "" : "s"}… This can take a while.`;
+
+  let added = 0;
+  let failed = 0;
+  const errors = [];
+
+  for (const url of urls) {
+    try {
+      const r = await fetch("/api/videos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ url })
+      });
+
+      const data = await r.json();
+
+      if (!r.ok) {
+        failed++;
+        errors.push(data.error || "Unknown error");
+        continue;
+      }
+
+      added++;
+
+      $("#message").textContent =
+        `Processed ${added + failed} of ${urls.length}…`;
+      
+      load();
+
+    } catch (error) {
+      failed++;
+      errors.push(error.message);
+    }
+  }
+
+  $("#url").value = "";
+
+  if (failed === 0) {
+    $("#message").textContent =
+      `${added} video${added === 1 ? "" : "s"} added and analyzed.`;
+  } else {
+    $("#message").textContent =
+      `${added} added, ${failed} failed.` +
+      (errors.length ? ` ${errors.join(" ")}` : "");
+  }
+
+  load();
+};
+$("#refresh").onclick = load;
+load();
+</script>
+</body>
+</html>

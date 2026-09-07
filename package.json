@@ -1,0 +1,16 @@
+{
+  "name": "youtube-guess-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Guess the YouTube video from an automatically selected audio clip.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "main": "server.js",
+  "author": "",
+  "license": "ISC"
+}
