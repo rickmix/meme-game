@@ -2,135 +2,529 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
   <title>Guess Game — Admin</title>
-  <link rel="stylesheet" href="/style.css">
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
+
 <body>
+
 <main class="app">
+
   <header>
+
     <div>
-      <div class="eyebrow">ADMIN</div>
-      <h1>Video library</h1>
+
+      <div class="eyebrow">
+        ADMIN
+      </div>
+
+      <h1>
+        Video library
+      </h1>
+
     </div>
-    <a class="admin-link" href="/">← Game</a>
+
+    <div style="
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    ">
+
+      <button
+        id="logout"
+        class="secondary"
+      >
+        Logout
+      </button>
+
+      <a
+        class="admin-link"
+        href="/"
+      >
+        ← Game
+      </a>
+
+    </div>
+
   </header>
 
+
+  <!-- ADD VIDEO -->
+
   <section class="card">
-    <h2>Add a YouTube video</h2>
-      <p class="muted">
-      The server downloads and stores the full audio. A random audible 20-second section is selected when a game round starts.
-      </p>    
+
+    <h2>
+      Add a YouTube video
+    </h2>
+
+    <p class="muted">
+      The server downloads and stores the full audio.
+      A random 10-second section is selected when a game
+      round starts.
+    </p>
+
     <form id="addForm">
+
       <textarea
         id="url"
         required
         rows="4"
         placeholder="Paste YouTube URLs separated by commas&#10;&#10;https://www.youtube.com/watch?v=abc123, https://youtu.be/xyz456"
       ></textarea>
-      <button class="primary">Add & process</button>
+
+      <button
+        class="primary"
+        type="submit"
+      >
+        Add & process
+      </button>
+
     </form>
+
     <p id="message"></p>
+
   </section>
+
+
+  <!-- VIDEO LIBRARY -->
 
   <section class="card">
+
     <div class="library-head">
-      <h2>Your videos</h2>
-      <button id="refresh" class="secondary">Refresh</button>
+
+      <h2>
+        Your videos
+      </h2>
+
+      <button
+        id="refresh"
+        class="secondary"
+      >
+        Refresh
+      </button>
+
     </div>
+
     <div id="list"></div>
+
   </section>
+
 </main>
+
+
 <script>
-const $ = s => document.querySelector(s);
+
+const $ =
+  selector =>
+    document.querySelector(
+      selector
+    );
+
+
+// ============================================================
+// HTML ESCAPING
+// ============================================================
+
+function escapeHtml(value) {
+
+  return String(
+    value ?? ""
+  ).replace(
+    /[&<>"']/g,
+    character => ({
+      "&":
+        "&amp;",
+
+      "<":
+        "&lt;",
+
+      ">":
+        "&gt;",
+
+      '"':
+        "&quot;",
+
+      "'":
+        "&#039;"
+    }[character])
+  );
+
+}
+
+
+// ============================================================
+// LOAD VIDEOS
+// ============================================================
 
 async function load() {
-  const r = await fetch("/api/videos");
-  const videos = await r.json();
-  $("#list").innerHTML = videos.length ? videos.map(v => `
-    <div class="video-row">
-      <div>
-        <strong>${escapeHtml(v.title)}</strong>
-        <small>${escapeHtml(v.channel || "")} · ${v.ready ? "✓ Ready" : "Processing…"}</small>
-      </div>
-      <button class="danger" onclick="removeVideo('${v.id}')">Delete</button>
-    </div>
-  `).join("") : '<p class="muted">No videos yet.</p>';
-}
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-}
-async function removeVideo(id) {
-  if (!confirm("Delete this video?")) return;
-  await fetch("/api/videos/" + id, {method:"DELETE"});
-  load();
-}
-$("#addForm").onsubmit = async e => {
-  e.preventDefault();
 
-  const urls = $("#url").value
-    .split(",")
-    .map(url => url.trim())
-    .filter(Boolean);
+  try {
 
-  if (!urls.length) {
-    $("#message").textContent = "Please enter at least one YouTube URL.";
+    const response =
+      await fetch(
+        "/api/videos"
+      );
+
+    if (
+      response.status ===
+      401
+    ) {
+
+      window.location.href =
+        "/admin-login.html";
+
+      return;
+    }
+
+    const videos =
+      await response.json();
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+        videos.error ||
+        "Could not load videos."
+      );
+
+    }
+
+    $("#list").innerHTML =
+      videos.length
+
+        ? videos.map(
+            video => `
+              <div class="video-row">
+
+                <div>
+
+                  <strong>
+                    ${escapeHtml(
+                      video.title
+                    )}
+                  </strong>
+
+                  <small>
+                    ${escapeHtml(
+                      video.channel || ""
+                    )}
+                    ·
+                    ${
+                      video.ready
+                        ? "✓ Ready"
+                        : "Processing…"
+                    }
+                  </small>
+
+                </div>
+
+                <button
+                  class="danger"
+                  onclick="removeVideo('${escapeHtml(video.id)}')"
+                >
+                  Delete
+                </button>
+
+              </div>
+            `
+          ).join("")
+
+        : `
+          <p class="muted">
+            No videos yet.
+          </p>
+        `;
+
+  } catch (error) {
+
+    $("#list").innerHTML = `
+      <p style="color: #ff6b6b;">
+        ${escapeHtml(
+          error.message
+        )}
+      </p>
+    `;
+
+  }
+
+}
+
+
+// ============================================================
+// DELETE VIDEO
+// ============================================================
+
+async function removeVideo(
+  id
+) {
+
+  if (
+    !confirm(
+      "Delete this video?"
+    )
+  ) {
     return;
   }
 
-  $("#message").textContent =
-    `Processing ${urls.length} video${urls.length === 1 ? "" : "s"}… This can take a while.`;
+  try {
 
-  let added = 0;
-  let failed = 0;
-  const errors = [];
+    const response =
+      await fetch(
+        "/api/videos/" +
+        encodeURIComponent(id),
+        {
+          method:
+            "DELETE"
+        }
+      );
 
-  for (const url of urls) {
-    try {
-      const r = await fetch("/api/videos", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ url })
-      });
+    if (
+      response.status ===
+      401
+    ) {
 
-      const data = await r.json();
+      window.location.href =
+        "/admin-login.html";
 
-      if (!r.ok) {
-        failed++;
-        errors.push(data.error || "Unknown error");
-        continue;
-      }
+      return;
+    }
 
-      added++;
+    const data =
+      await response.json();
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+        data.error ||
+        "Could not delete video."
+      );
+
+    }
+
+    load();
+
+  } catch (error) {
+
+    alert(
+      error.message
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// ADD VIDEOS
+// ============================================================
+
+$("#addForm").onsubmit =
+  async event => {
+
+    event.preventDefault();
+
+    const urls =
+      $("#url").value
+        .split(",")
+        .map(
+          url =>
+            url.trim()
+        )
+        .filter(Boolean);
+
+    if (
+      !urls.length
+    ) {
 
       $("#message").textContent =
-        `Processed ${added + failed} of ${urls.length}…`;
-      
-      load();
+        "Please enter at least one YouTube URL.";
 
-    } catch (error) {
-      failed++;
-      errors.push(error.message);
+      return;
     }
-  }
 
-  $("#url").value = "";
-
-  if (failed === 0) {
     $("#message").textContent =
-      `${added} video${added === 1 ? "" : "s"} added and analyzed.`;
-  } else {
-    $("#message").textContent =
-      `${added} added, ${failed} failed.` +
-      (errors.length ? ` ${errors.join(" ")}` : "");
-  }
+      `Processing ${urls.length} video${
+        urls.length === 1
+          ? ""
+          : "s"
+      }… This can take a while.`;
 
-  load();
-};
-$("#refresh").onclick = load;
+    let added = 0;
+    let failed = 0;
+
+    const errors = [];
+
+
+    for (
+      const url of urls
+    ) {
+
+      try {
+
+        const response =
+          await fetch(
+            "/api/videos",
+            {
+              method:
+                "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json"
+              },
+
+              body:
+                JSON.stringify({
+                  url
+                })
+            }
+          );
+
+
+        if (
+          response.status ===
+          401
+        ) {
+
+          window.location.href =
+            "/admin-login.html";
+
+          return;
+        }
+
+
+        const data =
+          await response.json();
+
+
+        if (
+          !response.ok
+        ) {
+
+          failed++;
+
+          errors.push(
+            data.error ||
+            "Unknown error"
+          );
+
+          continue;
+        }
+
+
+        added++;
+
+
+        $("#message").textContent =
+          `Processed ${
+            added + failed
+          } of ${
+            urls.length
+          }…`;
+
+
+        load();
+
+
+      } catch (error) {
+
+        failed++;
+
+        errors.push(
+          error.message
+        );
+
+      }
+
+    }
+
+
+    $("#url").value = "";
+
+
+    if (
+      failed === 0
+    ) {
+
+      $("#message").textContent =
+        `${added} video${
+          added === 1
+            ? ""
+            : "s"
+        } added and analyzed.`;
+
+    } else {
+
+      $("#message").textContent =
+        `${added} added, ${failed} failed.` +
+        (
+          errors.length
+            ? ` ${errors.join(" ")}`
+            : ""
+        );
+
+    }
+
+
+    load();
+
+  };
+
+
+// ============================================================
+// REFRESH
+// ============================================================
+
+$("#refresh").onclick =
+  load;
+
+
+// ============================================================
+// LOGOUT
+// ============================================================
+
+$("#logout").onclick =
+  async () => {
+
+    try {
+
+      await fetch(
+        "/admin-logout",
+        {
+          method:
+            "POST"
+        }
+      );
+
+    } finally {
+
+      window.location.href =
+        "/admin-login.html";
+
+    }
+
+  };
+
+
+// ============================================================
+// INITIAL LOAD
+// ============================================================
+
 load();
+
 </script>
+
 </body>
 </html>

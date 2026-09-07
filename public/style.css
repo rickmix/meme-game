@@ -424,11 +424,15 @@ form .primary {
   right: 0;
   top: calc(100% + 7px);
   background: #181d28;
-  border: 1px solid #343c4d;
+  border: none;
   border-radius: 13px;
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
   text-align: left;
+}
+
+.suggestions.has-suggestions {
+    border: 1px solid #343c4d;
 }
 
 .suggestion {

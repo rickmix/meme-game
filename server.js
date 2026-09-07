@@ -16,6 +16,8 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 const ROOT = __dirname;
+const PUBLIC = path.join(ROOT, "public");
+
 const DATA = path.join(ROOT, "data");
 const DB = path.join(DATA, "videos.json");
 const AUDIO = path.join(DATA, "audio");
@@ -23,6 +25,11 @@ const VIDEOS = path.join(DATA, "videos");
 const TEMP_CLIPS = path.join(AUDIO, "temp");
 
 const YTDLP = "/usr/local/bin/yt-dlp";
+
+
+// ============================================================
+// SETUP
+// ============================================================
 
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(AUDIO, { recursive: true });
@@ -34,8 +41,259 @@ if (!fs.existsSync(DB)) {
 }
 
 app.use(express.json());
-app.use(express.static(path.join(ROOT, "public")));
-app.use("/audio", express.static(AUDIO));
+
+
+// ============================================================
+// ADMIN AUTHENTICATION
+// ============================================================
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+if (!ADMIN_PASSWORD) {
+  console.warn(
+    "WARNING: ADMIN_PASSWORD is not set. Admin login will be unavailable."
+  );
+}
+
+const adminSessions = new Map();
+
+const ADMIN_SESSION_DURATION =
+  24 * 60 * 60 * 1000;
+
+
+// ------------------------------------------------------------
+// Parse cookies
+// ------------------------------------------------------------
+
+function parseCookies(req) {
+  const header = req.headers.cookie;
+
+  if (!header) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map(cookie => cookie.trim())
+      .filter(Boolean)
+      .map(cookie => {
+        const index = cookie.indexOf("=");
+
+        if (index === -1) {
+          return [cookie, ""];
+        }
+
+        const key = cookie.slice(0, index);
+        const value = cookie.slice(index + 1);
+
+        try {
+          return [
+            key,
+            decodeURIComponent(value)
+          ];
+        } catch {
+          return [
+            key,
+            value
+          ];
+        }
+      })
+  );
+}
+
+
+// ------------------------------------------------------------
+// Check admin session
+// ------------------------------------------------------------
+
+function isAdminAuthenticated(req) {
+  const cookies = parseCookies(req);
+
+  const token =
+    cookies.admin_session;
+
+  if (!token) {
+    return false;
+  }
+
+  const session =
+    adminSessions.get(token);
+
+  if (!session) {
+    return false;
+  }
+
+  if (
+    Date.now() >
+    session.expiresAt
+  ) {
+    adminSessions.delete(token);
+
+    return false;
+  }
+
+  return true;
+}
+
+
+// ------------------------------------------------------------
+// Protect admin resources
+// ------------------------------------------------------------
+
+function requireAdmin(req, res, next) {
+  if (
+    !isAdminAuthenticated(req)
+  ) {
+    if (
+      req.path === "/admin.html"
+    ) {
+      return res.redirect(
+        "/admin-login.html"
+      );
+    }
+
+    return res.status(401).json({
+      error:
+        "Admin authentication required."
+    });
+  }
+
+  next();
+}
+
+
+// ------------------------------------------------------------
+// Login
+// ------------------------------------------------------------
+
+app.post(
+  "/admin-login",
+  (req, res) => {
+    const password =
+      String(
+        req.body.password || ""
+      );
+
+    if (!ADMIN_PASSWORD) {
+      return res.status(500).json({
+        error:
+          "Admin password is not configured on the server."
+      });
+    }
+
+    if (
+      password !==
+      ADMIN_PASSWORD
+    ) {
+      return res.status(401).json({
+        error:
+          "Incorrect password."
+      });
+    }
+
+    const token =
+      crypto.randomBytes(32).toString("hex");
+
+    adminSessions.set(
+      token,
+      {
+        expiresAt:
+          Date.now() +
+          ADMIN_SESSION_DURATION
+      }
+    );
+
+    res.setHeader(
+      "Set-Cookie",
+      [
+        `admin_session=${token}`,
+        "HttpOnly",
+        "Path=/",
+        "SameSite=Strict",
+        `Max-Age=${ADMIN_SESSION_DURATION / 1000}`
+      ].join("; ")
+    );
+
+    res.json({
+      success: true
+    });
+  }
+);
+
+
+// ------------------------------------------------------------
+// Logout
+// ------------------------------------------------------------
+
+app.post(
+  "/admin-logout",
+  (req, res) => {
+    const cookies =
+      parseCookies(req);
+
+    const token =
+      cookies.admin_session;
+
+    if (token) {
+      adminSessions.delete(
+        token
+      );
+    }
+
+    res.setHeader(
+      "Set-Cookie",
+      [
+        "admin_session=",
+        "HttpOnly",
+        "Path=/",
+        "SameSite=Strict",
+        "Max-Age=0"
+      ].join("; ")
+    );
+
+    res.json({
+      success: true
+    });
+  }
+);
+
+
+// ------------------------------------------------------------
+// Protected admin page
+//
+// IMPORTANT:
+// This must be BEFORE express.static().
+// Otherwise express.static() would serve admin.html
+// without checking the password.
+// ------------------------------------------------------------
+
+app.get(
+  "/admin.html",
+  requireAdmin,
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        PUBLIC,
+        "admin.html"
+      )
+    );
+  }
+);
+
+
+// ------------------------------------------------------------
+// Public static files
+// ------------------------------------------------------------
+
+app.use(
+  express.static(PUBLIC)
+);
+
+app.use(
+  "/audio",
+  express.static(AUDIO)
+);
 
 
 // ============================================================
@@ -44,14 +302,22 @@ app.use("/audio", express.static(AUDIO));
 
 function readDb() {
   return JSON.parse(
-    fs.readFileSync(DB, "utf8")
+    fs.readFileSync(
+      DB,
+      "utf8"
+    )
   );
 }
+
 
 function writeDb(videos) {
   fs.writeFileSync(
     DB,
-    JSON.stringify(videos, null, 2)
+    JSON.stringify(
+      videos,
+      null,
+      2
+    )
   );
 }
 
@@ -62,9 +328,15 @@ function writeDb(videos) {
 
 function videoIdFromUrl(input) {
   try {
-    const u = new URL(input.trim());
+    const u =
+      new URL(
+        input.trim()
+      );
 
-    if (u.hostname === "youtu.be") {
+    if (
+      u.hostname ===
+      "youtu.be"
+    ) {
       return u.pathname
         .slice(1)
         .split("/")[0]
@@ -72,21 +344,38 @@ function videoIdFromUrl(input) {
     }
 
     if (
-      u.hostname === "youtube.com" ||
-      u.hostname === "www.youtube.com" ||
-      u.hostname.endsWith(".youtube.com")
+      u.hostname ===
+        "youtube.com" ||
+      u.hostname ===
+        "www.youtube.com" ||
+      u.hostname.endsWith(
+        ".youtube.com"
+      )
     ) {
-      if (u.pathname === "/watch") {
-        return u.searchParams.get("v");
+      if (
+        u.pathname ===
+        "/watch"
+      ) {
+        return u.searchParams.get(
+          "v"
+        );
       }
 
-      if (u.pathname.startsWith("/shorts/")) {
+      if (
+        u.pathname.startsWith(
+          "/shorts/"
+        )
+      ) {
         return u.pathname
           .split("/")[2]
           ?.trim();
       }
 
-      if (u.pathname.startsWith("/embed/")) {
+      if (
+        u.pathname.startsWith(
+          "/embed/"
+        )
+      ) {
         return u.pathname
           .split("/")[2]
           ?.trim();
@@ -100,10 +389,18 @@ function videoIdFromUrl(input) {
 }
 
 
-async function command(name, args) {
-  return execFileAsync(name, args, {
-    maxBuffer: 20 * 1024 * 1024
-  });
+async function command(
+  name,
+  args
+) {
+  return execFileAsync(
+    name,
+    args,
+    {
+      maxBuffer:
+        20 * 1024 * 1024
+    }
+  );
 }
 
 
@@ -113,24 +410,30 @@ async function command(name, args) {
 
 async function getDuration(file) {
   const { stdout } =
-    await command("ffprobe", [
-      "-v",
-      "error",
-      "-show_entries",
-      "format=duration",
-      "-of",
-      "default=noprint_wrappers=1:nokey=1",
-      file
-    ]);
+    await command(
+      "ffprobe",
+      [
+        "-v",
+        "error",
 
-  return Number(stdout.trim());
+        "-show_entries",
+        "format=duration",
+
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+
+        file
+      ]
+    );
+
+  return Number(
+    stdout.trim()
+  );
 }
 
 
 // ------------------------------------------------------------
 // Find a random good audible section
-//
-// This keeps the same logic you were already using.
 // ------------------------------------------------------------
 
 async function findGoodSection(audioFile) {
@@ -138,8 +441,7 @@ async function findGoodSection(audioFile) {
     `Detecting silence in ${path.basename(audioFile)}...`
   );
 
-  const duration =
-    await getDuration(audioFile);
+  const duration = await getDuration(audioFile);
 
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new Error(
@@ -147,20 +449,28 @@ async function findGoodSection(audioFile) {
     );
   }
 
+  // If the entire audio is 10 seconds or shorter,
+  // start at the beginning.
+  if (duration <= 10) {
+    return {
+      start: 0,
+      duration
+    };
+  }
+
   let silences = [];
 
   try {
-    const { stderr } =
-      await command("ffmpeg", [
-        "-hide_banner",
-        "-i",
-        audioFile,
-        "-af",
-        "silencedetect=noise=-35dB:d=0.35",
-        "-f",
-        "null",
-        "-"
-      ]);
+    const { stderr } = await command("ffmpeg", [
+      "-hide_banner",
+      "-i",
+      audioFile,
+      "-af",
+      "silencedetect=noise=-35dB:d=0.35",
+      "-f",
+      "null",
+      "-"
+    ]);
 
     const starts = [
       ...stderr.matchAll(
@@ -176,10 +486,7 @@ async function findGoodSection(audioFile) {
 
     for (
       let i = 0;
-      i < Math.min(
-        starts.length,
-        ends.length
-      );
+      i < Math.min(starts.length, ends.length);
       i++
     ) {
       if (
@@ -212,11 +519,7 @@ async function findGoodSection(audioFile) {
       ]);
     }
 
-    cursor =
-      Math.max(
-        cursor,
-        end
-      );
+    cursor = Math.max(cursor, end);
   }
 
   if (cursor < duration) {
@@ -226,22 +529,15 @@ async function findGoodSection(audioFile) {
     ]);
   }
 
-  // ----------------------------------------------------------
-  // Prefer sections that are at least 20 seconds long.
-  // This guarantees the generated clip can actually be 20 sec.
-  // ----------------------------------------------------------
-
+  // Prefer an audible section of at least 10 seconds.
   const longAudibleSections =
     audible.filter(
       ([start, end]) =>
-        end - start >= 20
+        end - start >= 10
     );
 
   if (longAudibleSections.length) {
-    const [
-      start,
-      end
-    ] =
+    const [start, end] =
       longAudibleSections[
         Math.floor(
           Math.random() *
@@ -250,7 +546,7 @@ async function findGoodSection(audioFile) {
       ];
 
     const maxStart =
-      end - 20;
+      end - 10;
 
     const safeStart =
       start +
@@ -270,25 +566,16 @@ async function findGoodSection(audioFile) {
     };
   }
 
-  // ----------------------------------------------------------
-  // If we can't find a completely audible 20-second section,
-  // use any reasonably long audible section.
-  //
-  // This is useful for music where silencedetect finds lots
-  // of small pauses.
-  // ----------------------------------------------------------
-
+  // If there isn't a completely audible 10-second section,
+  // choose a shorter audible section and let ffmpeg loop it.
   const mediumAudibleSections =
     audible.filter(
       ([start, end]) =>
-        end - start >= 5
+        end - start >= 3
     );
 
   if (mediumAudibleSections.length) {
-    const [
-      start,
-      end
-    ] =
+    const [start, end] =
       mediumAudibleSections[
         Math.floor(
           Math.random() *
@@ -296,10 +583,16 @@ async function findGoodSection(audioFile) {
         )
       ];
 
+    const sectionLength =
+      end - start;
+
     const maxStart =
       Math.max(
         start,
-        end - 20
+        end - Math.min(
+          10,
+          sectionLength
+        )
       );
 
     const safeStart =
@@ -320,28 +613,19 @@ async function findGoodSection(audioFile) {
     };
   }
 
-  // ----------------------------------------------------------
-  // FINAL FALLBACK
-  //
-  // If silence detection couldn't find anything useful,
-  // simply choose a random 20-second section from the song.
-  //
-  // This prevents one unusual audio file from killing a game.
-  // ----------------------------------------------------------
-
+  // Final fallback: random 10-second section.
   const maxStart =
-    duration - 20;
+    Math.max(
+      0,
+      duration - 10
+    );
 
   const randomStart =
     Math.random() *
-    Math.max(
-      0,
-      maxStart
-    );
+    maxStart;
 
   console.warn(
-    `No suitable audible section found for ${path.basename(audioFile)}. ` +
-    `Using random 20-second section instead.`
+    `No suitable audible section found for ${path.basename(audioFile)}. Using random 10-second section instead.`
   );
 
   return {
@@ -354,9 +638,8 @@ async function findGoodSection(audioFile) {
   };
 }
 
-
 // ------------------------------------------------------------
-// Generate a temporary 20-second clip
+// Generate temporary 10-second clip
 // ------------------------------------------------------------
 
 async function createTemporaryClip(id) {
@@ -390,7 +673,7 @@ async function createTemporaryClip(id) {
     );
 
   console.log(
-    `Creating temporary 20-second clip for ${id} at ${section.start}s...`
+    `Creating temporary 10-second clip for ${id} at ${section.start}s...`
   );
 
   await command("ffmpeg", [
@@ -406,7 +689,7 @@ async function createTemporaryClip(id) {
     audioFile,
 
     "-t",
-    "20",
+    "10",
 
     "-ac",
     "1",
@@ -427,24 +710,27 @@ async function createTemporaryClip(id) {
   ]);
 
   console.log(
-    `Temporary clip created: ${filename}`
+    `Temporary 10-second clip created: ${filename}`
   );
 
   return {
     filename,
+
     audioUrl:
       `/audio/temp/${filename}`,
+
     start:
       section.start
   };
 }
 
-
 // ------------------------------------------------------------
-// Delete a temporary clip
+// Delete temporary clip
 // ------------------------------------------------------------
 
-function deleteTemporaryClip(filename) {
+function deleteTemporaryClip(
+  filename
+) {
   if (!filename) {
     return;
   }
@@ -452,7 +738,9 @@ function deleteTemporaryClip(filename) {
   const file =
     path.join(
       TEMP_CLIPS,
-      path.basename(filename)
+      path.basename(
+        filename
+      )
     );
 
   fs.rmSync(
@@ -466,13 +754,14 @@ function deleteTemporaryClip(filename) {
 
 // ------------------------------------------------------------
 // Clean old temporary clips
-//
-// This protects against clips remaining if a browser,
-// server or game disconnects unexpectedly.
 // ------------------------------------------------------------
 
 function cleanupTemporaryClips() {
-  if (!fs.existsSync(TEMP_CLIPS)) {
+  if (
+    !fs.existsSync(
+      TEMP_CLIPS
+    )
+  ) {
     return;
   }
 
@@ -482,7 +771,12 @@ function cleanupTemporaryClips() {
   const MAX_AGE =
     30 * 60 * 1000;
 
-  for (const filename of fs.readdirSync(TEMP_CLIPS)) {
+  for (
+    const filename
+    of fs.readdirSync(
+      TEMP_CLIPS
+    )
+  ) {
     const file =
       path.join(
         TEMP_CLIPS,
@@ -491,10 +785,13 @@ function cleanupTemporaryClips() {
 
     try {
       const stat =
-        fs.statSync(file);
+        fs.statSync(
+          file
+        );
 
       if (
-        now - stat.mtimeMs >
+        now -
+          stat.mtimeMs >
         MAX_AGE
       ) {
         fs.rmSync(
@@ -509,8 +806,7 @@ function cleanupTemporaryClips() {
         );
       }
     } catch {
-      // Ignore files that disappear
-      // during cleanup.
+      // File may have disappeared.
     }
   }
 }
@@ -525,7 +821,9 @@ setInterval(
 // VIDEO PROCESSING
 // ============================================================
 
-async function processVideo(id) {
+async function processVideo(
+  id
+) {
   const outputTemplate =
     path.join(
       AUDIO,
@@ -536,28 +834,31 @@ async function processVideo(id) {
     `Downloading full audio for ${id}...`
   );
 
-  await command(YTDLP, [
-    "--no-playlist",
+  await command(
+    YTDLP,
+    [
+      "--no-playlist",
 
-    "--cookies-from-browser",
-    "firefox",
+      "--cookies-from-browser",
+      "firefox",
 
-    "-f",
-    "bestaudio/best",
+      "-f",
+      "bestaudio/best",
 
-    "--extract-audio",
+      "--extract-audio",
 
-    "--audio-format",
-    "mp3",
+      "--audio-format",
+      "mp3",
 
-    "--audio-quality",
-    "0",
+      "--audio-quality",
+      "0",
 
-    "-o",
-    outputTemplate,
+      "-o",
+      outputTemplate,
 
-    `https://www.youtube.com/watch?v=${id}`
-  ]);
+      `https://www.youtube.com/watch?v=${id}`
+    ]
+  );
 
   const audioFile =
     path.join(
@@ -565,7 +866,11 @@ async function processVideo(id) {
       `${id}.mp3`
     );
 
-  if (!fs.existsSync(audioFile)) {
+  if (
+    !fs.existsSync(
+      audioFile
+    )
+  ) {
     throw new Error(
       "yt-dlp did not create the expected MP3 file."
     );
@@ -577,7 +882,9 @@ async function processVideo(id) {
     );
 
   const meta =
-    await getYoutubeMetadata(id);
+    await getYoutubeMetadata(
+      id
+    );
 
   console.log(
     `Full audio saved: ${audioFile}`
@@ -596,22 +903,27 @@ async function processVideo(id) {
 }
 
 
-async function getYoutubeMetadata(id) {
+async function getYoutubeMetadata(
+  id
+) {
   try {
     const { stdout } =
-      await command(YTDLP, [
-        "--no-playlist",
+      await command(
+        YTDLP,
+        [
+          "--no-playlist",
 
-        "--cookies-from-browser",
-        "firefox",
+          "--cookies-from-browser",
+          "firefox",
 
-        "--print",
-        "%(title)s",
+          "--print",
+          "%(title)s",
 
-        "--skip-download",
+          "--skip-download",
 
-        `https://www.youtube.com/watch?v=${id}`
-      ]);
+          `https://www.youtube.com/watch?v=${id}`
+        ]
+      );
 
     return {
       title:
@@ -629,32 +941,40 @@ async function getYoutubeMetadata(id) {
 
 
 // ============================================================
-// SINGLE PLAYER API
+// VIDEO API
 // ============================================================
+//
+// IMPORTANT:
+// All video management endpoints are admin-only.
+//
+
 
 app.get(
   "/api/videos",
+  requireAdmin,
   (req, res) => {
     res.json(
-      readDb().map(v => ({
-        id:
-          v.id,
+      readDb().map(
+        v => ({
+          id:
+            v.id,
 
-        title:
-          v.title,
+          title:
+            v.title,
 
-        channel:
-          v.channel,
+          channel:
+            v.channel,
 
-        duration:
-          v.duration,
+          duration:
+            v.duration,
 
-        ready:
-          v.ready,
+          ready:
+            v.ready,
 
-        createdAt:
-          v.createdAt
-      }))
+          createdAt:
+            v.createdAt
+        })
+      )
     );
   }
 );
@@ -662,6 +982,7 @@ app.get(
 
 app.post(
   "/api/videos",
+  requireAdmin,
   async (req, res) => {
     const id =
       videoIdFromUrl(
@@ -680,7 +1001,8 @@ app.post(
 
     const alreadyExists =
       db.some(
-        v => v.id === id
+        v =>
+          v.id === id
       );
 
     const audioExists =
@@ -727,14 +1049,17 @@ app.post(
       );
 
       const result =
-        await processVideo(id);
+        await processVideo(
+          id
+        );
 
       const currentDb =
         readDb();
 
       const current =
         currentDb.find(
-          v => v.id === id
+          v =>
+            v.id === id
         );
 
       if (!current) {
@@ -770,13 +1095,11 @@ app.post(
         e
       );
 
-      const currentDb =
-        readDb().filter(
-          v => v.id !== id
-        );
-
       writeDb(
-        currentDb
+        readDb().filter(
+          v =>
+            v.id !== id
+        )
       );
 
       fs.rmSync(
@@ -785,8 +1108,7 @@ app.post(
           `${id}.mp3`
         ),
         {
-          force:
-            true
+          force: true
         }
       );
 
@@ -804,13 +1126,15 @@ app.post(
 
 app.delete(
   "/api/videos/:id",
+  requireAdmin,
   (req, res) => {
     const id =
       req.params.id;
 
     writeDb(
       readDb().filter(
-        v => v.id !== id
+        v =>
+          v.id !== id
       )
     );
 
@@ -820,8 +1144,7 @@ app.delete(
         `${id}.mp3`
       ),
       {
-        force:
-          true
+        force: true
       }
     );
 
@@ -831,8 +1154,7 @@ app.delete(
         `${id}-clip.mp3`
       ),
       {
-        force:
-          true
+        force: true
       }
     );
 
@@ -842,19 +1164,20 @@ app.delete(
         `${id}.wav`
       ),
       {
-        force:
-          true
+        force: true
       }
     );
 
-    // Remove any temporary clips
-    // belonging to this video.
     if (
-      fs.existsSync(TEMP_CLIPS)
+      fs.existsSync(
+        TEMP_CLIPS
+      )
     ) {
       for (
-        const filename of
-        fs.readdirSync(TEMP_CLIPS)
+        const filename
+        of fs.readdirSync(
+          TEMP_CLIPS
+        )
       ) {
         if (
           filename.startsWith(
@@ -867,8 +1190,7 @@ app.delete(
               filename
             ),
             {
-              force:
-                true
+              force: true
             }
           );
         }
@@ -876,16 +1198,15 @@ app.delete(
     }
 
     res.json({
-      ok:
-        true
+      ok: true
     });
   }
 );
 
 
-// ------------------------------------------------------------
-// Start single-player game
-// ------------------------------------------------------------
+// ============================================================
+// SINGLE PLAYER
+// ============================================================
 
 app.get(
   "/api/game",
@@ -895,8 +1216,8 @@ app.get(
         readDb();
 
       const ready =
-        videos.filter(v => {
-          return (
+        videos.filter(
+          v =>
             v.ready &&
             fs.existsSync(
               path.join(
@@ -904,8 +1225,7 @@ app.get(
                 `${v.id}.mp3`
               )
             )
-          );
-        });
+        );
 
       if (!ready.length) {
         return res.status(400).json({
@@ -924,16 +1244,19 @@ app.get(
 
       const choices =
         ready
-          .map(v => ({
-            id:
-              v.id,
+          .map(
+            v => ({
+              id:
+                v.id,
 
-            title:
-              v.title
-          }))
+              title:
+                v.title
+            })
+          )
           .sort(
             () =>
-              Math.random() - 0.5
+              Math.random() -
+              0.5
           );
 
       const clip =
@@ -988,14 +1311,14 @@ const ROUND_DURATION =
 
 
 // ------------------------------------------------------------
-// Helpers
+// Generate party code
 // ------------------------------------------------------------
 
 function generatePartyCode() {
   const chars =
     "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-  let code = "";
+  let code;
 
   do {
     code = "";
@@ -1021,12 +1344,13 @@ function generatePartyCode() {
 }
 
 
-function getReadyVideos() {
-  const videos =
-    readDb();
+// ------------------------------------------------------------
+// Get playable videos
+// ------------------------------------------------------------
 
-  return videos.filter(v => {
-    return (
+function getReadyVideos() {
+  return readDb().filter(
+    v =>
       v.ready &&
       fs.existsSync(
         path.join(
@@ -1034,10 +1358,13 @@ function getReadyVideos() {
           `${v.id}.mp3`
         )
       )
-    );
-  });
+  );
 }
 
+
+// ------------------------------------------------------------
+// Public party information
+// ------------------------------------------------------------
 
 function publicParty(party) {
   return {
@@ -1057,41 +1384,51 @@ function publicParty(party) {
       party.roundNumber,
 
     players:
-      party.players.map(p => ({
-        id:
-          p.id,
+      party.players.map(
+        p => ({
+          id:
+            p.id,
 
-        name:
-          p.name,
+          name:
+            p.name,
 
-        score:
-          p.score,
+          score:
+            p.score,
 
-        answered:
-          p.answered
-      }))
+          answered:
+            p.answered
+        })
+      )
   };
 }
 
 
-function broadcastParty(party) {
+function broadcastParty(
+  party
+) {
   io.to(
     party.code
   ).emit(
     "partyUpdated",
-    publicParty(party)
+    publicParty(
+      party
+    )
   );
 }
 
 
-function findPlayer(socketId) {
+function findPlayer(
+  socketId
+) {
   for (
-    const party of parties.values()
+    const party
+    of parties.values()
   ) {
     const player =
       party.players.find(
         p =>
-          p.id === socketId
+          p.id ===
+          socketId
       );
 
     if (player) {
@@ -1106,50 +1443,55 @@ function findPlayer(socketId) {
 }
 
 
-// ------------------------------------------------------------
-// Create multiplayer round
-// ------------------------------------------------------------
+// ============================================================
+// CREATE MULTIPLAYER ROUND
+// ============================================================
 
-async function createMultiplayerRound(party) {
-  const ready = getReadyVideos();
+async function createMultiplayerRound(
+  party
+) {
+  const ready =
+    getReadyVideos();
 
-  if (ready.length < party.rounds) {
+  if (
+    ready.length <
+    party.rounds
+  ) {
     throw new Error(
-      `Not enough playable videos for this game. ` +
-      `The game needs ${party.rounds}, but only ${ready.length} are available.`
+      `Not enough playable videos for this game. The game needs ${party.rounds}, but only ${ready.length} are available.`
     );
   }
 
-  // Only videos that have NOT already been used
-  // as an answer in this match.
-  const available = ready.filter(
-    video =>
-      !party.usedVideoIds.includes(
-        video.id
-      )
-  );
+  const available =
+    ready.filter(
+      video =>
+        !party.usedVideoIds.includes(
+          video.id
+        )
+    );
 
-  if (!available.length) {
+  if (
+    !available.length
+  ) {
     throw new Error(
       `There are no unused playable videos left for round ${party.roundNumber + 1}.`
     );
   }
 
-  // Randomize the available answer videos.
   const shuffled =
     [...available].sort(
       () =>
-        Math.random() - 0.5
+        Math.random() -
+        0.5
     );
 
   let answer = null;
   let clip = null;
 
-  // Try videos until we successfully create a clip.
-  //
-  // This means one corrupted/short/problematic audio file
-  // cannot stop the entire multiplayer game.
-  for (const candidate of shuffled) {
+  for (
+    const candidate
+    of shuffled
+  ) {
     try {
       console.log(
         `Trying multiplayer answer video ${candidate.id}...`
@@ -1176,52 +1518,53 @@ async function createMultiplayerRound(party) {
     }
   }
 
-  // None of the unused videos could produce a clip.
-  if (!answer || !clip) {
+  if (
+    !answer ||
+    !clip
+  ) {
     throw new Error(
       "Could not create an audio clip from any unused video."
     );
   }
 
-  // Only mark the answer as used AFTER the clip
-  // has successfully been created.
   party.usedVideoIds.push(
     answer.id
   );
-
-  // ----------------------------------------------------------
-  // Create five distractors.
-  //
-  // Distractors are allowed to have appeared in previous
-  // rounds because they were not the actual answer.
-  // ----------------------------------------------------------
 
   const distractors =
     ready
       .filter(
         video =>
-          video.id !== answer.id
+          video.id !==
+          answer.id
       )
       .sort(
         () =>
-          Math.random() - 0.5
+          Math.random() -
+          0.5
       )
-      .slice(0, 5);
+      .slice(
+        0,
+        5
+      );
 
   const choices = [
     answer,
     ...distractors
   ]
-    .map(v => ({
-      id:
-        v.id,
+    .map(
+      v => ({
+        id:
+          v.id,
 
-      title:
-        v.title
-    }))
+        title:
+          v.title
+      })
+    )
     .sort(
       () =>
-        Math.random() - 0.5
+        Math.random() -
+        0.5
     );
 
   party.answerId =
@@ -1280,9 +1623,9 @@ async function createMultiplayerRound(party) {
 }
 
 
-// ------------------------------------------------------------
-// Start round
-// ------------------------------------------------------------
+// ============================================================
+// START NEXT ROUND
+// ============================================================
 
 async function startNextRound(
   party
@@ -1349,19 +1692,23 @@ async function startNextRound(
     );
 
     party.roundTimer =
-      setTimeout(() => {
-        if (
-          parties.has(
-            party.code
-          ) &&
-          party.started
-        ) {
-          finishRound(
-            party,
-            "timeout"
-          );
-        }
-      }, (ROUND_DURATION + 2) * 1000);
+      setTimeout(
+        () => {
+          if (
+            parties.has(
+              party.code
+            ) &&
+            party.started
+          ) {
+            finishRound(
+              party,
+              "timeout"
+            );
+          }
+        },
+        (ROUND_DURATION + 2) *
+          1000
+      );
 
   } catch (error) {
     console.error(
@@ -1382,9 +1729,9 @@ async function startNextRound(
 }
 
 
-// ------------------------------------------------------------
-// Finish round
-// ------------------------------------------------------------
+// ============================================================
+// FINISH ROUND
+// ============================================================
 
 function finishRound(
   party,
@@ -1402,7 +1749,9 @@ function finishRound(
   party.roundFinished =
     true;
 
-  if (party.roundTimer) {
+  if (
+    party.roundTimer
+  ) {
     clearTimeout(
       party.roundTimer
     );
@@ -1423,22 +1772,24 @@ function finishRound(
 
   const results =
     party.players
-      .map(player => ({
-        playerId:
-          player.id,
+      .map(
+        player => ({
+          playerId:
+            player.id,
 
-        name:
-          player.name,
+          name:
+            player.name,
 
-        correct:
-          player.correct,
+          correct:
+            player.correct,
 
-        points:
-          player.pointsThisRound,
+          points:
+            player.pointsThisRound,
 
-        totalScore:
-          player.score
-      }))
+          totalScore:
+            player.score
+        })
+      )
       .sort(
         (a, b) =>
           b.points -
@@ -1489,62 +1840,61 @@ function finishRound(
     party
   );
 
-  // The clip is no longer needed
-  // after the round has finished.
-  //
-  // Delete it shortly after clients
-  // have had time to finish playback.
   const oldClip =
     party.clipFilename;
 
   party.clipFilename =
     null;
 
-  setTimeout(() => {
-    deleteTemporaryClip(
-      oldClip
-    );
-  }, 5000);
+  setTimeout(
+    () => {
+      deleteTemporaryClip(
+        oldClip
+      );
+    },
+    5000
+  );
 
-
-  // If this was the last round,
-  // finish the entire game.
   if (
     party.roundNumber >=
     party.rounds
   ) {
-    setTimeout(() => {
-      finishGame(
-        party
-      );
-    }, 3500);
+    setTimeout(
+      () => {
+        finishGame(
+          party
+        );
+      },
+      3500
+    );
 
     return;
   }
 
+  setTimeout(
+    () => {
+      if (
+        parties.has(
+          party.code
+        ) &&
+        party.started
+      ) {
+        party.roundFinished =
+          false;
 
-  // Otherwise start next round.
-  setTimeout(() => {
-    if (
-      parties.has(
-        party.code
-      ) &&
-      party.started
-    ) {
-      party.roundFinished =
-        false;
-
-      startNextRound(
-        party
-      );
-    }
-  }, 3500);
+        startNextRound(
+          party
+        );
+      }
+    },
+    3500
+  );
 }
 
 
-// ------------------------------------------------------------
-// Finish complete game
-// ------------------------------------------------------------
+// ============================================================
+// FINISH GAME
+// ============================================================
 
 function finishGame(
   party
@@ -1557,7 +1907,9 @@ function finishGame(
     return;
   }
 
-  if (party.roundTimer) {
+  if (
+    party.roundTimer
+  ) {
     clearTimeout(
       party.roundTimer
     );
@@ -1588,7 +1940,10 @@ function finishGame(
           a.score
       )
       .map(
-        (player, index) => ({
+        (
+          player,
+          index
+        ) => ({
           id:
             player.id,
 
@@ -1632,7 +1987,6 @@ function finishGame(
 io.on(
   "connection",
   socket => {
-
     console.log(
       `Socket connected: ${socket.id}`
     );
@@ -1689,7 +2043,10 @@ io.on(
           const ready =
             getReadyVideos();
 
-          if (ready.length < rounds) {
+          if (
+            ready.length <
+            rounds
+          ) {
             return socket.emit(
               "errorMessage",
               {
@@ -1716,7 +2073,8 @@ io.on(
             roundNumber:
               0,
 
-            usedVideoIds: [],
+            usedVideoIds:
+              [],
 
             players: [
               {
@@ -1778,7 +2136,9 @@ io.on(
 
           socket.emit(
             "partyCreated",
-            publicParty(party)
+            publicParty(
+              party
+            )
           );
 
           broadcastParty(
@@ -1945,7 +2305,9 @@ io.on(
 
           socket.emit(
             "partyJoined",
-            publicParty(party)
+            publicParty(
+              party
+            )
           );
 
           broadcastParty(
@@ -2021,7 +2383,10 @@ io.on(
         const ready =
           getReadyVideos();
 
-        if (ready.length < party.rounds) {
+        if (
+          ready.length <
+          party.rounds
+        ) {
           return socket.emit(
             "errorMessage",
             {
@@ -2042,6 +2407,9 @@ io.on(
 
         party.roundFinished =
           false;
+
+        party.usedVideoIds =
+          [];
 
         broadcastParty(
           party
@@ -2133,12 +2501,6 @@ io.on(
                 p.correct
             ).length;
 
-          // First correct = 5
-          // Second = 4
-          // Third = 3
-          // Fourth = 2
-          // Fifth = 1
-          // Sixth = 0
           points =
             Math.max(
               5 -
@@ -2252,7 +2614,6 @@ function removePlayer(
         socket.id
     );
 
-  // No players left.
   if (
     party.players.length ===
     0
@@ -2284,8 +2645,6 @@ function removePlayer(
     return;
   }
 
-  // If host leaves, give host
-  // control to the next player.
   if (
     party.hostId ===
     socket.id
@@ -2304,9 +2663,6 @@ function removePlayer(
     );
   }
 
-  // If the game is running and
-  // everyone remaining has answered,
-  // finish the round.
   if (
     party.started &&
     !party.roundFinished &&

@@ -17,7 +17,7 @@ let state = {
     score: 0,
     round: 0,
     seconds: 0.3,
-    maxSeconds: 20,
+    maxSeconds: 10,
     answerId: null,
     choices: [],
     won: false
@@ -106,14 +106,11 @@ async function newRound() {
 function setupAnswerInput() {
     const input = $("#answerInput");
     const suggestions = $("#suggestions");
-    const submit = $("#submitAnswer");
 
     input.value = "";
     suggestions.innerHTML = "";
 
     input.disabled = false;
-    submit.disabled = false;
-
     input.focus();
 }
 
@@ -126,6 +123,7 @@ function showSuggestions() {
     box.innerHTML = "";
 
     if (!query || state.won) {
+        box.classList.remove("has-suggestions");
         return;
     }
 
@@ -134,6 +132,13 @@ function showSuggestions() {
             choice.title.toLowerCase().includes(query)
         )
         .slice(0, 6);
+
+    if (matches.length === 0) {
+        box.classList.remove("has-suggestions");
+        return;
+    }
+
+    box.classList.add("has-suggestions");
 
     matches.forEach((choice) => {
         const button = document.createElement("button");
@@ -145,6 +150,7 @@ function showSuggestions() {
         button.addEventListener("click", () => {
             input.value = choice.title;
             box.innerHTML = "";
+            box.classList.remove("has-suggestions");
 
             guess(choice.id);
         });
@@ -218,7 +224,6 @@ function guess(id) {
         $("#score").textContent = state.score;
 
         $("#answerInput").disabled = true;
-        $("#submitAnswer").disabled = true;
         $("#dontKnow").disabled = true;
 
         $("#suggestions").innerHTML = "";
@@ -360,8 +365,6 @@ $("#playBtn").onclick = playClip;
 
 $("#dontKnow").onclick = revealMore;
 
-$("#submitAnswer").onclick = submitTypedAnswer;
-
 $("#answerInput").addEventListener(
     "input",
     showSuggestions
@@ -411,26 +414,98 @@ audio.addEventListener("ended", () => {
 // MODE SWITCHING
 // ============================================================
 
-const singleTab = $("#singleTab");
-const multiTab = $("#multiTab");
-
-const singlePlayer = $("#singlePlayer");
-const multiplayer = $("#multiplayer");
-
-singleTab.onclick = () => {
+function switchToSinglePlayer() {
     singleTab.classList.add("active");
     multiTab.classList.remove("active");
 
     singlePlayer.classList.remove("hidden");
     multiplayer.classList.add("hidden");
-};
+}
 
-multiTab.onclick = () => {
+
+function switchToMultiplayer() {
     multiTab.classList.add("active");
     singleTab.classList.remove("active");
 
     multiplayer.classList.remove("hidden");
     singlePlayer.classList.add("hidden");
+}
+
+
+function switchMode(targetMode) {
+    const currentMode =
+        singlePlayer.classList.contains("hidden")
+            ? "multiplayer"
+            : "single";
+
+    if (currentMode === targetMode) {
+        return;
+    }
+
+    // --------------------------------------------------------
+    // Leaving SINGLE PLAYER
+    // --------------------------------------------------------
+
+    if (
+        currentMode === "single" &&
+        !$("#game").classList.contains("hidden")
+    ) {
+        const confirmed = confirm(
+            "You are currently playing a game.\n\n" +
+            "Switching modes will end your current game.\n\n" +
+            "Do you want to continue?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        endSinglePlayerSession();
+    }
+
+    // --------------------------------------------------------
+    // Leaving MULTIPLAYER
+    // --------------------------------------------------------
+
+    if (currentMode === "multiplayer") {
+        if (
+            multiState.party &&
+            multiState.party.started
+        ) {
+            const confirmed = confirm(
+                "You are currently playing a multiplayer game.\n\n" +
+                "Switching modes will make you leave the party " +
+                "and end your current game.\n\n" +
+                "Do you want to continue?"
+            );
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        endMultiplayerSession();
+    }
+
+    // --------------------------------------------------------
+    // Switch
+    // --------------------------------------------------------
+
+    if (targetMode === "single") {
+        switchToSinglePlayer();
+    } else {
+        switchToMultiplayer();
+    }
+}
+
+
+singleTab.onclick = () => {
+    switchMode("single");
+};
+
+
+multiTab.onclick = () => {
+    switchMode("multiplayer");
 };
 
 // ============================================================
@@ -443,7 +518,7 @@ let multiState = {
     answered: false,
     roundActive: false,
     startAt: null,
-    duration: 20
+    duration: 10
 };
 
 socket.on("connect", () => {
@@ -1222,6 +1297,81 @@ $("#leavePartyBtn").onclick =
 
 $("#finalLeaveBtn").onclick =
     leaveMultiplayerParty;
+
+// ============================================================
+// END CURRENT GAME / SESSION
+// ============================================================
+
+function endSinglePlayerSession() {
+    stopSinglePlayerAudio();
+
+    state = {
+        score: 0,
+        round: 0,
+        seconds: 0.3,
+        maxSeconds: 10,
+        answerId: null,
+        choices: [],
+        won: false
+    };
+
+    $("#score").textContent = "0";
+    $("#round").textContent = "1";
+    $("#clipTime").textContent = "0.3s";
+    $("#durationLabel").textContent = "0.3s";
+
+    $("#answerInput").value = "";
+    $("#answerInput").disabled = false;
+    $("#suggestions").innerHTML = "";
+    $("#result").classList.add("hidden");
+
+    $("#setupError").textContent = "";
+
+    $("#setup").classList.remove("hidden");
+    $("#game").classList.add("hidden");
+}
+
+
+function endMultiplayerSession() {
+    // Tell the server we are leaving the party.
+    if (multiState.party) {
+        socket.emit("leaveParty");
+    }
+
+    multiState.party = null;
+    multiState.answered = false;
+    multiState.roundActive = false;
+    multiState.startAt = null;
+    multiState.duration = 10;
+
+    multiAudio.pause();
+    multiAudio.currentTime = 0;
+    multiAudio.removeAttribute("src");
+    multiAudio.load();
+
+    multiSetup.classList.remove("hidden");
+    multiLobby.classList.add("hidden");
+    multiGame.classList.add("hidden");
+    multiRoundResult.classList.add("hidden");
+    multiFinalResult.classList.add("hidden");
+
+    $("#multiChoices").innerHTML = "";
+    $("#multiAnswerStatus").className =
+        "answer-status hidden";
+
+    $("#multiAnswerStatus").textContent = "";
+
+    $("#multiScoreboard").innerHTML = "";
+
+    $("#multiScore").textContent = "0";
+    $("#multiPlayerCount").textContent = "0";
+
+    $("#multiRoundProgress").style.width = "0%";
+
+    $("#multiSetupError").textContent = "";
+    $("#lobbyHint").textContent =
+        "Share the party code with your friends.";
+}
 
 // ============================================================
 // MULTIPLAYER AUDIO PROGRESS
