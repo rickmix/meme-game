@@ -26,59 +26,21 @@ let state = {
 const REVEAL_TIMES = [
     0.3,
     0.5,
-    0.7,
     1,
-    1.5,
-    2,
-    3,
-    4,
     5,
-    6,
-    7,
-    8,
-    9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16,
-    17,
-    18,
-    19,
-    20
+    10
 ];
 
 const POINTS = {
     0.3: 1000,
-    0.5: 950,
-    0.7: 900,
-    1: 850,
-    1.5: 750,
-    2: 650,
-    3: 550,
-    4: 450,
-    5: 400,
-    6: 350,
-    7: 300,
-    8: 275,
-    9: 250,
-    10: 225,
-    11: 200,
-    12: 175,
-    13: 150,
-    14: 125,
-    15: 100,
-    16: 80,
-    17: 60,
-    18: 50,
-    19: 40,
-    20: 25
+    0.5: 800,
+    1: 600,
+    5: 200,
+    10: 50
 };
 
 function pointsFor(sec) {
-    return POINTS[sec] || 25;
+    return POINTS[sec] || 0;
 }
 
 // ============================================================
@@ -86,13 +48,11 @@ function pointsFor(sec) {
 // ============================================================
 
 function stopSinglePlayerAudio() {
-    // Stop the main game audio
     audio.pause();
     audio.currentTime = 0;
     audio.removeAttribute("src");
     audio.load();
 
-    // Stop the result/replay audio
     clipAudio.pause();
     clipAudio.currentTime = 0;
     clipAudio.removeAttribute("src");
@@ -102,10 +62,10 @@ function stopSinglePlayerAudio() {
 }
 
 async function newRound() {
-    $("#setupError").textContent = "";
-
-    // Stop any audio from the previous round
+    // Stop audio from the previous round
     stopSinglePlayerAudio();
+
+    $("#setupError").textContent = "";
 
     const response = await fetch("/api/game");
     const data = await response.json();
@@ -134,6 +94,9 @@ async function newRound() {
     $("#progress").style.width = "0%";
 
     setupAnswerInput();
+
+    // Automatically start the new round
+    playClip();
 }
 
 // ============================================================
@@ -295,8 +258,10 @@ function guess(id) {
 // ============================================================
 
 function playClip() {
+    // Make sure result/replay audio isn't playing
     clipAudio.pause();
     clipAudio.currentTime = 0;
+    clipAudio.classList.add("hidden");
 
     audio.currentTime = 0;
 
