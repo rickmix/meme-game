@@ -998,8 +998,7 @@ async function getYoutubeMetadata(
       [
         "--no-playlist",
 
-        // "--cookies-from-browser",
-        // "firefox",
+        "--cookies", "/etc/secrets/youtube-cookies.txt",
 
         "--print",
         "%(title)s\t%(channel)s",
@@ -1072,8 +1071,7 @@ async function processVideo(
     [
       "--no-playlist",
 
-      // "--cookies-from-browser",
-      // "firefox",
+      "--cookies", "/etc/secrets/youtube-cookies.txt",
 
       "-f",
       "bestaudio/best",
