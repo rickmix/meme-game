@@ -2509,12 +2509,14 @@ function startMultiplayerRound(round) {
 
   multiState.audioDuration =
     Number(
-      round.audioDuration
+      round.audioDuration ??
+      round.clipDuration
     ) || 0;
 
   multiState.startTime =
     Number(
-      round.startTime
+      round.startTime ??
+      round.clipStart
     ) || 0;
 
   multiState.startAt =
@@ -2870,16 +2872,12 @@ function submitMultiAnswer(answerId) {
   stopMultiAudio();
   disableMultiChoices();
 
-  socket.emit(
-    "submitAnswer",
-    {
-      code: multiState.partyCode,
-      partyCode: multiState.partyCode,
-
-      // The server expects "choiceId"
-      choiceId: answerId
-    }
-  );
+  socket.emit("submitAnswer", {
+    code: multiState.partyCode,
+    partyCode: multiState.partyCode,
+    answerId: answerId,
+    videoId: answerId
+  });
 
   if (answerId === null) {
     showMultiAnswerStatus(
