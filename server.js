@@ -22,7 +22,6 @@ const DATA = path.join(ROOT, "data");
 const DB = path.join(DATA, "videos.json");
 const AUDIO = path.join(DATA, "audio");
 const VIDEOS = path.join(DATA, "videos");
-const TEMP_CLIPS = path.join(AUDIO, "temp");
 
 const YTDLP = "/usr/local/bin/yt-dlp";
 
@@ -34,7 +33,6 @@ const YTDLP = "/usr/local/bin/yt-dlp";
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(AUDIO, { recursive: true });
 fs.mkdirSync(VIDEOS, { recursive: true });
-fs.mkdirSync(TEMP_CLIPS, { recursive: true });
 
 if (!fs.existsSync(DB)) {
   fs.writeFileSync(DB, "[]");
@@ -109,27 +107,20 @@ function parseCookies(req) {
 
 function isAdminAuthenticated(req) {
   const cookies = parseCookies(req);
-
-  const token =
-    cookies.admin_session;
+  const token = cookies.admin_session;
 
   if (!token) {
     return false;
   }
 
-  const session =
-    adminSessions.get(token);
+  const session = adminSessions.get(token);
 
   if (!session) {
     return false;
   }
 
-  if (
-    Date.now() >
-    session.expiresAt
-  ) {
+  if (Date.now() > session.expiresAt) {
     adminSessions.delete(token);
-
     return false;
   }
 
@@ -142,20 +133,13 @@ function isAdminAuthenticated(req) {
 // ------------------------------------------------------------
 
 function requireAdmin(req, res, next) {
-  if (
-    !isAdminAuthenticated(req)
-  ) {
-    if (
-      req.path === "/admin.html"
-    ) {
-      return res.redirect(
-        "/admin-login.html"
-      );
+  if (!isAdminAuthenticated(req)) {
+    if (req.path === "/admin.html") {
+      return res.redirect("/admin-login.html");
     }
 
     return res.status(401).json({
-      error:
-        "Admin authentication required."
+      error: "Admin authentication required."
     });
   }
 
@@ -170,10 +154,9 @@ function requireAdmin(req, res, next) {
 app.post(
   "/admin-login",
   (req, res) => {
-    const password =
-      String(
-        req.body.password || ""
-      );
+    const password = String(
+      req.body.password || ""
+    );
 
     if (!ADMIN_PASSWORD) {
       return res.status(500).json({
@@ -182,13 +165,9 @@ app.post(
       });
     }
 
-    if (
-      password !==
-      ADMIN_PASSWORD
-    ) {
+    if (password !== ADMIN_PASSWORD) {
       return res.status(401).json({
-        error:
-          "Incorrect password."
+        error: "Incorrect password."
       });
     }
 
@@ -229,16 +208,11 @@ app.post(
 app.post(
   "/admin-logout",
   (req, res) => {
-    const cookies =
-      parseCookies(req);
-
-    const token =
-      cookies.admin_session;
+    const cookies = parseCookies(req);
+    const token = cookies.admin_session;
 
     if (token) {
-      adminSessions.delete(
-        token
-      );
+      adminSessions.delete(token);
     }
 
     res.setHeader(
@@ -261,11 +235,6 @@ app.post(
 
 // ------------------------------------------------------------
 // Protected admin page
-//
-// IMPORTANT:
-// This must be BEFORE express.static().
-// Otherwise express.static() would serve admin.html
-// without checking the password.
 // ------------------------------------------------------------
 
 app.get(
@@ -301,12 +270,21 @@ app.use(
 // ============================================================
 
 function readDb() {
-  return JSON.parse(
-    fs.readFileSync(
-      DB,
-      "utf8"
-    )
-  );
+  try {
+    return JSON.parse(
+      fs.readFileSync(
+        DB,
+        "utf8"
+      )
+    );
+  } catch (error) {
+    console.error(
+      "Could not read database:",
+      error
+    );
+
+    return [];
+  }
 }
 
 
@@ -328,15 +306,11 @@ function writeDb(videos) {
 
 function videoIdFromUrl(input) {
   try {
-    const u =
-      new URL(
-        input.trim()
-      );
+    const u = new URL(
+      input.trim()
+    );
 
-    if (
-      u.hostname ===
-      "youtu.be"
-    ) {
+    if (u.hostname === "youtu.be") {
       return u.pathname
         .slice(1)
         .split("/")[0]
@@ -344,38 +318,21 @@ function videoIdFromUrl(input) {
     }
 
     if (
-      u.hostname ===
-        "youtube.com" ||
-      u.hostname ===
-        "www.youtube.com" ||
-      u.hostname.endsWith(
-        ".youtube.com"
-      )
+      u.hostname === "youtube.com" ||
+      u.hostname === "www.youtube.com" ||
+      u.hostname.endsWith(".youtube.com")
     ) {
-      if (
-        u.pathname ===
-        "/watch"
-      ) {
-        return u.searchParams.get(
-          "v"
-        );
+      if (u.pathname === "/watch") {
+        return u.searchParams.get("v");
       }
 
-      if (
-        u.pathname.startsWith(
-          "/shorts/"
-        )
-      ) {
+      if (u.pathname.startsWith("/shorts/")) {
         return u.pathname
           .split("/")[2]
           ?.trim();
       }
 
-      if (
-        u.pathname.startsWith(
-          "/embed/"
-        )
-      ) {
+      if (u.pathname.startsWith("/embed/")) {
         return u.pathname
           .split("/")[2]
           ?.trim();
@@ -389,10 +346,7 @@ function videoIdFromUrl(input) {
 }
 
 
-async function command(
-  name,
-  args
-) {
+async function command(name, args) {
   return execFileAsync(
     name,
     args,
@@ -426,404 +380,519 @@ async function getDuration(file) {
       ]
     );
 
-  return Number(
-    stdout.trim()
-  );
-}
+  const duration =
+    Number(
+      stdout.trim()
+    );
 
-
-// ------------------------------------------------------------
-// Find a random good audible section
-// ------------------------------------------------------------
-
-async function findGoodSection(audioFile) {
-  console.log(
-    `Detecting silence in ${path.basename(audioFile)}...`
-  );
-
-  const duration = await getDuration(audioFile);
-
-  if (!Number.isFinite(duration) || duration <= 0) {
+  if (!Number.isFinite(duration)) {
     throw new Error(
       "Could not determine audio duration."
     );
   }
 
-  // If the entire audio is 10 seconds or shorter,
-  // start at the beginning.
-  if (duration <= 10) {
-    return {
-      start: 0,
-      duration
-    };
-  }
+  return duration;
+}
 
-  let silences = [];
 
-  try {
-    const { stderr } = await command("ffmpeg", [
-      "-hide_banner",
-      "-i",
-      audioFile,
-      "-af",
-      "silencedetect=noise=-35dB:d=0.35",
-      "-f",
-      "null",
-      "-"
-    ]);
+// ============================================================
+// FIND GOOD AUDIO SECTIONS
+// ============================================================
 
-    const starts = [
-      ...stderr.matchAll(
-        /silence_start:\s*([0-9.]+)/g
-      )
-    ].map(m => Number(m[1]));
+async function findGoodSections(audioFile) {
+  console.log(
+    `Analyzing audio for good sections: ${audioFile}`
+  );
 
-    const ends = [
-      ...stderr.matchAll(
-        /silence_end:\s*([0-9.]+)/g
-      )
-    ].map(m => Number(m[1]));
+  const duration =
+    await getDuration(audioFile);
 
-    for (
-      let i = 0;
-      i < Math.min(starts.length, ends.length);
-      i++
-    ) {
-      if (
-        Number.isFinite(starts[i]) &&
-        Number.isFinite(ends[i]) &&
-        ends[i] > starts[i]
-      ) {
-        silences.push([
-          starts[i],
-          ends[i]
-        ]);
-      }
-    }
-  } catch (error) {
-    console.warn(
-      `Silence detection failed for ${path.basename(audioFile)}:`,
-      error.message
+
+  if (
+    !Number.isFinite(duration) ||
+    duration < 2
+  ) {
+    throw new Error(
+      "Audio is shorter than the 2-second minimum."
     );
   }
 
-  const audible = [];
+
+  if (duration < 10) {
+    console.log(
+      `Video is ${duration.toFixed(2)} seconds long. Using the entire video.`
+    );
+
+    return {
+      duration,
+
+      goodSections: [
+        {
+          start: 0,
+
+          duration:
+            Number(
+              duration.toFixed(2)
+            )
+        }
+      ]
+    };
+  }
+
+
+  console.log(
+    "Video is 10+ seconds. Searching for audible 10-second sections..."
+  );
+
+
+  let result;
+
+  try {
+    result =
+      await command(
+        "ffmpeg",
+        [
+          "-hide_banner",
+
+          "-i",
+          audioFile,
+
+          "-af",
+          "silencedetect=noise=-35dB:d=0.35",
+
+          "-f",
+          "null",
+
+          "-"
+        ]
+      );
+  } catch (error) {
+    result = {
+      stdout:
+        error.stdout || "",
+
+      stderr:
+        error.stderr || ""
+    };
+  }
+
+
+  const output =
+    `${result.stdout || ""}\n${result.stderr || ""}`;
+
+  const lines =
+    output.split("\n");
+
+  const silences = [];
+
+  let silenceStart = null;
+
+
+  for (
+    const line
+    of lines
+  ) {
+    const startMatch =
+      line.match(
+        /silence_start:\s*([\d.]+)/
+      );
+
+    const endMatch =
+      line.match(
+        /silence_end:\s*([\d.]+)/
+      );
+
+
+    if (startMatch) {
+      silenceStart =
+        parseFloat(
+          startMatch[1]
+        );
+    }
+
+
+    if (
+      endMatch &&
+      silenceStart !== null
+    ) {
+      const silenceEnd =
+        parseFloat(
+          endMatch[1]
+        );
+
+
+      if (
+        Number.isFinite(
+          silenceEnd
+        )
+      ) {
+        silences.push({
+          start:
+            silenceStart,
+
+          end:
+            silenceEnd
+        });
+      }
+
+
+      silenceStart =
+        null;
+    }
+  }
+
+
+  if (
+    silenceStart !== null &&
+    silenceStart < duration
+  ) {
+    silences.push({
+      start:
+        silenceStart,
+
+      end:
+        duration
+    });
+  }
+
+
+  const audibleSections = [];
 
   let cursor = 0;
 
-  for (const [start, end] of silences) {
-    if (start > cursor) {
-      audible.push([
-        cursor,
-        start
-      ]);
-    }
-
-    cursor = Math.max(cursor, end);
-  }
-
-  if (cursor < duration) {
-    audible.push([
-      cursor,
-      duration
-    ]);
-  }
-
-  // Prefer an audible section of at least 10 seconds.
-  const longAudibleSections =
-    audible.filter(
-      ([start, end]) =>
-        end - start >= 10
-    );
-
-  if (longAudibleSections.length) {
-    const [start, end] =
-      longAudibleSections[
-        Math.floor(
-          Math.random() *
-            longAudibleSections.length
-        )
-      ];
-
-    const maxStart =
-      end - 10;
-
-    const safeStart =
-      start +
-      Math.random() *
-        Math.max(
-          0,
-          maxStart - start
-        );
-
-    return {
-      start:
-        Math.round(
-          safeStart * 100
-        ) / 100,
-
-      duration
-    };
-  }
-
-  // If there isn't a completely audible 10-second section,
-  // choose a shorter audible section and let ffmpeg loop it.
-  const mediumAudibleSections =
-    audible.filter(
-      ([start, end]) =>
-        end - start >= 3
-    );
-
-  if (mediumAudibleSections.length) {
-    const [start, end] =
-      mediumAudibleSections[
-        Math.floor(
-          Math.random() *
-            mediumAudibleSections.length
-        )
-      ];
-
-    const sectionLength =
-      end - start;
-
-    const maxStart =
-      Math.max(
-        start,
-        end - Math.min(
-          10,
-          sectionLength
-        )
-      );
-
-    const safeStart =
-      start +
-      Math.random() *
-        Math.max(
-          0,
-          maxStart - start
-        );
-
-    return {
-      start:
-        Math.round(
-          safeStart * 100
-        ) / 100,
-
-      duration
-    };
-  }
-
-  // Final fallback: random 10-second section.
-  const maxStart =
-    Math.max(
-      0,
-      duration - 10
-    );
-
-  const randomStart =
-    Math.random() *
-    maxStart;
-
-  console.warn(
-    `No suitable audible section found for ${path.basename(audioFile)}. Using random 10-second section instead.`
-  );
-
-  return {
-    start:
-      Math.round(
-        randomStart * 100
-      ) / 100,
-
-    duration
-  };
-}
-
-// ------------------------------------------------------------
-// Generate temporary 10-second clip
-// ------------------------------------------------------------
-
-async function createTemporaryClip(id) {
-  const audioFile =
-    path.join(
-      AUDIO,
-      `${id}.mp3`
-    );
-
-  if (!fs.existsSync(audioFile)) {
-    throw new Error(
-      `Full audio file not found for ${id}.`
-    );
-  }
-
-  const section =
-    await findGoodSection(
-      audioFile
-    );
-
-  const clipId =
-    crypto.randomUUID();
-
-  const filename =
-    `${id}-${clipId}.mp3`;
-
-  const clip =
-    path.join(
-      TEMP_CLIPS,
-      filename
-    );
-
-  console.log(
-    `Creating temporary 10-second clip for ${id} at ${section.start}s...`
-  );
-
-  await command("ffmpeg", [
-    "-y",
-
-    "-stream_loop",
-    "-1",
-
-    "-ss",
-    String(section.start),
-
-    "-i",
-    audioFile,
-
-    "-t",
-    "10",
-
-    "-ac",
-    "1",
-
-    "-ar",
-    "44100",
-
-    "-af",
-    "loudnorm=I=-16:TP=-1.5:LRA=11",
-
-    "-codec:a",
-    "libmp3lame",
-
-    "-b:a",
-    "128k",
-
-    clip
-  ]);
-
-  console.log(
-    `Temporary 10-second clip created: ${filename}`
-  );
-
-  return {
-    filename,
-
-    audioUrl:
-      `/audio/temp/${filename}`,
-
-    start:
-      section.start
-  };
-}
-
-// ------------------------------------------------------------
-// Delete temporary clip
-// ------------------------------------------------------------
-
-function deleteTemporaryClip(
-  filename
-) {
-  if (!filename) {
-    return;
-  }
-
-  const file =
-    path.join(
-      TEMP_CLIPS,
-      path.basename(
-        filename
-      )
-    );
-
-  fs.rmSync(
-    file,
-    {
-      force: true
-    }
-  );
-}
-
-
-// ------------------------------------------------------------
-// Clean old temporary clips
-// ------------------------------------------------------------
-
-function cleanupTemporaryClips() {
-  if (
-    !fs.existsSync(
-      TEMP_CLIPS
-    )
-  ) {
-    return;
-  }
-
-  const now =
-    Date.now();
-
-  const MAX_AGE =
-    30 * 60 * 1000;
 
   for (
-    const filename
-    of fs.readdirSync(
-      TEMP_CLIPS
-    )
+    const silence
+    of silences
   ) {
-    const file =
-      path.join(
-        TEMP_CLIPS,
-        filename
+    if (
+      silence.start >
+      cursor
+    ) {
+      audibleSections.push({
+        start:
+          cursor,
+
+        end:
+          silence.start,
+
+        duration:
+          silence.start -
+          cursor
+      });
+    }
+
+
+    cursor =
+      Math.max(
+        cursor,
+        silence.end
       );
+  }
 
-    try {
-      const stat =
-        fs.statSync(
-          file
-        );
 
-      if (
-        now -
-          stat.mtimeMs >
-        MAX_AGE
-      ) {
-        fs.rmSync(
-          file,
-          {
-            force: true
-          }
-        );
+  if (
+    cursor < duration
+  ) {
+    audibleSections.push({
+      start:
+        cursor,
 
-        console.log(
-          `Deleted old temporary clip: ${filename}`
-        );
-      }
-    } catch {
-      // File may have disappeared.
+      end:
+        duration,
+
+      duration:
+        duration -
+        cursor
+    });
+  }
+
+
+  if (
+    silences.length === 0
+  ) {
+    audibleSections.length = 0;
+
+    audibleSections.push({
+      start: 0,
+
+      end:
+        duration,
+
+      duration
+    });
+  }
+
+
+  console.log(
+    `Found ${audibleSections.length} audible sections.`
+  );
+
+
+  const candidates = [];
+
+
+  for (
+    const section
+    of audibleSections
+  ) {
+    if (
+      section.duration < 10
+    ) {
+      continue;
+    }
+
+
+    const usableDuration =
+      section.duration -
+      10;
+
+
+    if (
+      usableDuration <= 0
+    ) {
+      candidates.push({
+        start:
+          Number(
+            section.start.toFixed(2)
+          ),
+
+        duration: 10
+      });
+
+      continue;
+    }
+
+
+    const STEP = 5;
+
+
+    for (
+      let offset = 0;
+      offset <= usableDuration;
+      offset += STEP
+    ) {
+      const start =
+        section.start +
+        offset;
+
+      candidates.push({
+        start:
+          Number(
+            start.toFixed(2)
+          ),
+
+        duration: 10
+      });
+    }
+
+
+    const finalStart =
+      section.end - 10;
+
+
+    if (
+      finalStart >
+      section.start
+    ) {
+      candidates.push({
+        start:
+          Number(
+            finalStart.toFixed(2)
+          ),
+
+        duration: 10
+      });
     }
   }
+
+
+  const uniqueCandidates =
+    Array.from(
+      new Map(
+        candidates.map(
+          section => [
+            section.start,
+            section
+          ]
+        )
+      ).values()
+    );
+
+
+  uniqueCandidates.sort(
+    () =>
+      Math.random() -
+      0.5
+  );
+
+
+  const MAX_SECTIONS = 30;
+
+  let goodSections =
+    uniqueCandidates.slice(
+      0,
+      MAX_SECTIONS
+    );
+
+
+  if (
+    goodSections.length === 0
+  ) {
+    console.warn(
+      "No suitable audible 10-second sections found. Using fallback."
+    );
+
+
+    const maxStart =
+      duration - 10;
+
+
+    const start =
+      maxStart > 0
+        ? Math.random() *
+          maxStart
+        : 0;
+
+
+    goodSections = [
+      {
+        start:
+          Number(
+            start.toFixed(2)
+          ),
+
+        duration: 10
+      }
+    ];
+  }
+
+
+  goodSections.sort(
+    (a, b) =>
+      a.start -
+      b.start
+  );
+
+
+  console.log(
+    `Found ${goodSections.length} good sections:`,
+    goodSections
+  );
+
+
+  return {
+    duration,
+
+    goodSections
+  };
 }
 
-setInterval(
-  cleanupTemporaryClips,
-  5 * 60 * 1000
-);
+
+// ============================================================
+// PICK RANDOM SECTION
+// ============================================================
+
+function pickRandomSection(video) {
+  if (
+    !video.goodSections ||
+    !Array.isArray(
+      video.goodSections
+    ) ||
+    video.goodSections.length === 0
+  ) {
+    throw new Error(
+      `Video ${video.id} does not have any good audio sections.`
+    );
+  }
+
+  const index =
+    Math.floor(
+      Math.random() *
+        video.goodSections.length
+    );
+
+  return video.goodSections[
+    index
+  ];
+}
+
+
+// ============================================================
+// YOUTUBE METADATA
+// ============================================================
+
+async function getYoutubeMetadata(id) {
+  try {
+    const { stdout } =
+      await command(
+        YTDLP,
+        [
+          "--no-playlist",
+
+          "--cookies-from-browser",
+          "firefox",
+
+          "--print",
+          "%(title)s\t%(channel)s",
+
+          "--skip-download",
+
+          `https://www.youtube.com/watch?v=${id}`
+        ]
+      );
+
+    const line =
+      stdout.trim();
+
+    const separator =
+      line.indexOf("\t");
+
+    if (separator === -1) {
+      return {
+        title:
+          line,
+
+        channel:
+          ""
+      };
+    }
+
+    return {
+      title:
+        line.slice(
+          0,
+          separator
+        ).trim(),
+
+      channel:
+        line.slice(
+          separator + 1
+        ).trim()
+    };
+
+  } catch (error) {
+    console.error(
+      "Could not get YouTube metadata:",
+      error.message
+    );
+
+    return {
+      title:
+        `YouTube video ${id}`,
+
+      channel:
+        ""
+    };
+  }
+}
 
 
 // ============================================================
 // VIDEO PROCESSING
 // ============================================================
 
-async function processVideo(
-  id
-) {
+async function processVideo(id) {
   const outputTemplate =
     path.join(
       AUDIO,
@@ -866,36 +935,49 @@ async function processVideo(
       `${id}.mp3`
     );
 
-  if (
-    !fs.existsSync(
-      audioFile
-    )
-  ) {
+  if (!fs.existsSync(audioFile)) {
     throw new Error(
       "yt-dlp did not create the expected MP3 file."
     );
   }
 
-  const duration =
-    await getDuration(
-      audioFile
-    );
+  console.log(
+    `Full audio downloaded for ${id}.`
+  );
+
 
   const meta =
     await getYoutubeMetadata(
       id
     );
 
+
+  const {
+    duration,
+    goodSections
+  } =
+    await findGoodSections(
+      audioFile
+    );
+
+
   console.log(
-    `Full audio saved: ${audioFile}`
+    `Audio analysis complete for ${id}.`
   );
+
 
   return {
     title:
       meta.title ||
       `YouTube video ${id}`,
 
+    channel:
+      meta.channel ||
+      "",
+
     duration,
+
+    goodSections,
 
     audioUrl:
       `/audio/${id}.mp3`
@@ -903,51 +985,9 @@ async function processVideo(
 }
 
 
-async function getYoutubeMetadata(
-  id
-) {
-  try {
-    const { stdout } =
-      await command(
-        YTDLP,
-        [
-          "--no-playlist",
-
-          "--cookies-from-browser",
-          "firefox",
-
-          "--print",
-          "%(title)s",
-
-          "--skip-download",
-
-          `https://www.youtube.com/watch?v=${id}`
-        ]
-      );
-
-    return {
-      title:
-        stdout.trim()
-    };
-  } catch (error) {
-    console.error(
-      "Could not get YouTube title:",
-      error.message
-    );
-
-    return {};
-  }
-}
-
-
 // ============================================================
 // VIDEO API
 // ============================================================
-//
-// IMPORTANT:
-// All video management endpoints are admin-only.
-//
-
 
 app.get(
   "/api/videos",
@@ -967,6 +1007,9 @@ app.get(
 
           duration:
             v.duration,
+
+          goodSections:
+            v.goodSections?.length || 0,
 
           ready:
             v.ready,
@@ -1032,6 +1075,12 @@ app.post(
       channel:
         "",
 
+      duration:
+        0,
+
+      goodSections:
+        [],
+
       ready:
         false,
 
@@ -1039,9 +1088,13 @@ app.post(
         new Date().toISOString()
     };
 
-    db.push(item);
+    db.push(
+      item
+    );
 
-    writeDb(db);
+    writeDb(
+      db
+    );
 
     try {
       console.log(
@@ -1150,16 +1203,6 @@ app.delete(
 
     fs.rmSync(
       path.join(
-        AUDIO,
-        `${id}-clip.mp3`
-      ),
-      {
-        force: true
-      }
-    );
-
-    fs.rmSync(
-      path.join(
         VIDEOS,
         `${id}.wav`
       ),
@@ -1167,35 +1210,6 @@ app.delete(
         force: true
       }
     );
-
-    if (
-      fs.existsSync(
-        TEMP_CLIPS
-      )
-    ) {
-      for (
-        const filename
-        of fs.readdirSync(
-          TEMP_CLIPS
-        )
-      ) {
-        if (
-          filename.startsWith(
-            `${id}-`
-          )
-        ) {
-          fs.rmSync(
-            path.join(
-              TEMP_CLIPS,
-              filename
-            ),
-            {
-              force: true
-            }
-          );
-        }
-      }
-    }
 
     res.json({
       ok: true
@@ -1224,7 +1238,11 @@ app.get(
                 AUDIO,
                 `${v.id}.mp3`
               )
-            )
+            ) &&
+            Array.isArray(
+              v.goodSections
+            ) &&
+            v.goodSections.length > 0
         );
 
       if (!ready.length) {
@@ -1241,6 +1259,11 @@ app.get(
               ready.length
           )
         ];
+
+      const section =
+        pickRandomSection(
+          answer
+        );
 
       const choices =
         ready
@@ -1259,11 +1282,6 @@ app.get(
               0.5
           );
 
-      const clip =
-        await createTemporaryClip(
-          answer.id
-        );
-
       res.json({
         roundId:
           crypto.randomUUID(),
@@ -1272,7 +1290,13 @@ app.get(
           answer.id,
 
         audioUrl:
-          clip.audioUrl,
+          `/audio/${answer.id}.mp3`,
+
+        startTime:
+          section.start,
+
+        duration:
+          section.duration,
 
         choices
       });
@@ -1285,7 +1309,7 @@ app.get(
 
       res.status(500).json({
         error:
-          `Could not create audio clip: ${error.message}`
+          `Could not create game round: ${error.message}`
       });
     }
   }
@@ -1336,6 +1360,7 @@ function generatePartyCode() {
           )
         ];
     }
+
   } while (
     parties.has(code)
   );
@@ -1357,8 +1382,57 @@ function getReadyVideos() {
           AUDIO,
           `${v.id}.mp3`
         )
-      )
+      ) &&
+      Array.isArray(
+        v.goodSections
+      ) &&
+      v.goodSections.length > 0
   );
+}
+
+
+// ============================================================
+// MULTIPLAYER PLAYER SERIALIZATION
+// ============================================================
+//
+// Keep ALL clients receiving exactly the same player format.
+//
+
+function publicPlayer(player) {
+  return {
+    id:
+      player.id,
+
+    playerId:
+      player.id,
+
+    socketId:
+      player.id,
+
+    name:
+      player.name,
+
+    username:
+      player.name,
+
+    score:
+      Number(player.score) || 0,
+
+    totalScore:
+      Number(player.score) || 0,
+
+    points:
+      Number(player.score) || 0,
+
+    answered:
+      Boolean(player.answered),
+
+    correct:
+      Boolean(player.correct),
+
+    pointsThisRound:
+      Number(player.pointsThisRound) || 0
+  };
 }
 
 
@@ -1371,13 +1445,22 @@ function publicParty(party) {
     code:
       party.code,
 
+    partyCode:
+      party.code,
+
     hostId:
       party.hostId,
 
     started:
-      party.started,
+      Boolean(party.started),
+
+    gameFinished:
+      Boolean(party.gameFinished),
 
     rounds:
+      party.rounds,
+
+    totalRounds:
       party.rounds,
 
     roundNumber:
@@ -1385,41 +1468,42 @@ function publicParty(party) {
 
     players:
       party.players.map(
-        p => ({
-          id:
-            p.id,
-
-          name:
-            p.name,
-
-          score:
-            p.score,
-
-          answered:
-            p.answered
-        })
+        publicPlayer
       )
   };
 }
 
 
-function broadcastParty(
-  party
-) {
+// ============================================================
+// BROADCAST PARTY STATE
+// ============================================================
+//
+// This is the important part for the live lobby and scoreboard.
+//
+// Every time a player joins, leaves, answers, or the host changes,
+// EVERY player receives the complete current player list.
+//
+
+function broadcastParty(party) {
+  const state =
+    publicParty(
+      party
+    );
+
   io.to(
     party.code
   ).emit(
     "partyUpdated",
-    publicParty(
-      party
-    )
+    state
   );
 }
 
 
-function findPlayer(
-  socketId
-) {
+// ============================================================
+// FIND PLAYER
+// ============================================================
+
+function findPlayer(socketId) {
   for (
     const party
     of parties.values()
@@ -1447,9 +1531,7 @@ function findPlayer(
 // CREATE MULTIPLAYER ROUND
 // ============================================================
 
-async function createMultiplayerRound(
-  party
-) {
+async function createMultiplayerRound(party) {
   const ready =
     getReadyVideos();
 
@@ -1470,66 +1552,32 @@ async function createMultiplayerRound(
         )
     );
 
-  if (
-    !available.length
-  ) {
+  if (!available.length) {
     throw new Error(
       `There are no unused playable videos left for round ${party.roundNumber + 1}.`
     );
   }
 
-  const shuffled =
-    [...available].sort(
-      () =>
-        Math.random() -
-        0.5
+
+  const answer =
+    available[
+      Math.floor(
+        Math.random() *
+          available.length
+      )
+    ];
+
+
+  const section =
+    pickRandomSection(
+      answer
     );
 
-  let answer = null;
-  let clip = null;
-
-  for (
-    const candidate
-    of shuffled
-  ) {
-    try {
-      console.log(
-        `Trying multiplayer answer video ${candidate.id}...`
-      );
-
-      const generatedClip =
-        await createTemporaryClip(
-          candidate.id
-        );
-
-      answer =
-        candidate;
-
-      clip =
-        generatedClip;
-
-      break;
-
-    } catch (error) {
-      console.warn(
-        `Could not create clip for ${candidate.id}:`,
-        error.message
-      );
-    }
-  }
-
-  if (
-    !answer ||
-    !clip
-  ) {
-    throw new Error(
-      "Could not create an audio clip from any unused video."
-    );
-  }
 
   party.usedVideoIds.push(
     answer.id
   );
+
 
   const distractors =
     ready
@@ -1547,6 +1595,7 @@ async function createMultiplayerRound(
         0,
         5
       );
+
 
   const choices = [
     answer,
@@ -1567,17 +1616,16 @@ async function createMultiplayerRound(
         0.5
     );
 
+
   party.answerId =
     answer.id;
 
   party.choices =
     choices;
 
-  party.clipFilename =
-    clip.filename;
-
   party.answerOrder =
     [];
+
 
   party.players.forEach(
     player => {
@@ -1595,13 +1643,16 @@ async function createMultiplayerRound(
     }
   );
 
+
   party.roundNumber++;
+
 
   const startAt =
     Date.now() + 1500;
 
   party.startAt =
     startAt;
+
 
   return {
     roundNumber:
@@ -1613,12 +1664,18 @@ async function createMultiplayerRound(
     choices,
 
     audioUrl:
-      clip.audioUrl,
+      `/audio/${answer.id}.mp3`,
 
-    startAt,
+    startTime:
+      section.start,
+
+    audioDuration:
+      section.duration,
 
     duration:
-      ROUND_DURATION
+      ROUND_DURATION,
+
+    startAt
   };
 }
 
@@ -1627,14 +1684,8 @@ async function createMultiplayerRound(
 // START NEXT ROUND
 // ============================================================
 
-async function startNextRound(
-  party
-) {
-  if (
-    !parties.has(
-      party.code
-    )
-  ) {
+async function startNextRound(party) {
+  if (!parties.has(party.code)) {
     return;
   }
 
@@ -1656,25 +1707,13 @@ async function startNextRound(
       );
 
     if (
-      !parties.has(
-        party.code
-      ) ||
+      !parties.has(party.code) ||
       !party.started ||
       party.gameFinished
     ) {
-      if (
-        party.clipFilename
-      ) {
-        deleteTemporaryClip(
-          party.clipFilename
-        );
-
-        party.clipFilename =
-          null;
-      }
-
       return;
     }
+
 
     io.to(
       party.code
@@ -1683,13 +1722,17 @@ async function startNextRound(
       round
     );
 
+
+    // Immediately send the updated player state.
     broadcastParty(
       party
     );
 
+
     console.log(
       `Party ${party.code}: starting round ${party.roundNumber}/${party.rounds}`
     );
+
 
     party.roundTimer =
       setTimeout(
@@ -1722,7 +1765,7 @@ async function startNextRound(
       "errorMessage",
       {
         message:
-          `Could not create audio clip: ${error.message}`
+          `Could not create audio round: ${error.message}`
       }
     );
   }
@@ -1738,9 +1781,7 @@ function finishRound(
   reason = "allAnswered"
 ) {
   if (
-    !parties.has(
-      party.code
-    ) ||
+    !parties.has(party.code) ||
     party.roundFinished
   ) {
     return;
@@ -1749,9 +1790,8 @@ function finishRound(
   party.roundFinished =
     true;
 
-  if (
-    party.roundTimer
-  ) {
+
+  if (party.roundTimer) {
     clearTimeout(
       party.roundTimer
     );
@@ -1760,8 +1800,10 @@ function finishRound(
       null;
   }
 
+
   const db =
     readDb();
+
 
   const answer =
     db.find(
@@ -1770,6 +1812,7 @@ function finishRound(
         party.answerId
     );
 
+
   const results =
     party.players
       .map(
@@ -1777,17 +1820,29 @@ function finishRound(
           playerId:
             player.id,
 
+          id:
+            player.id,
+
           name:
             player.name,
 
           correct:
-            player.correct,
+            Boolean(player.correct),
 
           points:
-            player.pointsThisRound,
+            Number(
+              player.pointsThisRound
+            ) || 0,
 
           totalScore:
-            player.score
+            Number(
+              player.score
+            ) || 0,
+
+          score:
+            Number(
+              player.score
+            ) || 0
         })
       )
       .sort(
@@ -1795,6 +1850,13 @@ function finishRound(
           b.points -
           a.points
       );
+
+
+  const players =
+    party.players.map(
+      publicPlayer
+    );
+
 
   io.to(
     party.code
@@ -1818,42 +1880,21 @@ function finishRound(
 
       results,
 
-      players:
-        party.players.map(
-          player => ({
-            id:
-              player.id,
+      players,
 
-            name:
-              player.name,
-
-            score:
-              player.score
-          })
-        ),
+      scoreboard:
+        players,
 
       reason
     }
   );
 
+
+  // Keep the live scoreboard synchronized.
   broadcastParty(
     party
   );
 
-  const oldClip =
-    party.clipFilename;
-
-  party.clipFilename =
-    null;
-
-  setTimeout(
-    () => {
-      deleteTemporaryClip(
-        oldClip
-      );
-    },
-    5000
-  );
 
   if (
     party.roundNumber >=
@@ -1870,6 +1911,7 @@ function finishRound(
 
     return;
   }
+
 
   setTimeout(
     () => {
@@ -1896,20 +1938,13 @@ function finishRound(
 // FINISH GAME
 // ============================================================
 
-function finishGame(
-  party
-) {
-  if (
-    !parties.has(
-      party.code
-    )
-  ) {
+function finishGame(party) {
+  if (!parties.has(party.code)) {
     return;
   }
 
-  if (
-    party.roundTimer
-  ) {
+
+  if (party.roundTimer) {
     clearTimeout(
       party.roundTimer
     );
@@ -1918,45 +1953,35 @@ function finishGame(
       null;
   }
 
-  if (
-    party.clipFilename
-  ) {
-    deleteTemporaryClip(
-      party.clipFilename
-    );
-
-    party.clipFilename =
-      null;
-  }
 
   party.gameFinished =
     true;
+
+  party.started =
+    false;
+
 
   const finalPlayers =
     [...party.players]
       .sort(
         (a, b) =>
-          b.score -
-          a.score
+          (Number(b.score) || 0) -
+          (Number(a.score) || 0)
       )
       .map(
         (
           player,
           index
         ) => ({
-          id:
-            player.id,
-
-          name:
-            player.name,
-
-          score:
-            player.score,
+          ...publicPlayer(
+            player
+          ),
 
           position:
             index + 1
         })
       );
+
 
   io.to(
     party.code
@@ -1969,10 +1994,23 @@ function finishGame(
       rounds:
         party.rounds,
 
+      totalRounds:
+        party.rounds,
+
       players:
+        finalPlayers,
+
+      scoreboard:
         finalPlayers
     }
   );
+
+
+  // Also update normal party state.
+  broadcastParty(
+    party
+  );
+
 
   console.log(
     `Party ${party.code}: game finished`
@@ -1992,9 +2030,9 @@ io.on(
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // CREATE PARTY
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "createParty",
@@ -2010,6 +2048,7 @@ io.on(
               data?.rounds
             );
 
+
           if (!name) {
             return socket.emit(
               "errorMessage",
@@ -2020,9 +2059,8 @@ io.on(
             );
           }
 
-          if (
-            name.length > 20
-          ) {
+
+          if (name.length > 20) {
             return socket.emit(
               "errorMessage",
               {
@@ -2032,6 +2070,7 @@ io.on(
             );
           }
 
+
           if (
             !ROUND_OPTIONS.includes(
               rounds
@@ -2040,8 +2079,10 @@ io.on(
             rounds = 10;
           }
 
+
           const ready =
             getReadyVideos();
+
 
           if (
             ready.length <
@@ -2056,8 +2097,10 @@ io.on(
             );
           }
 
+
           const code =
             generatePartyCode();
+
 
           const party = {
             code,
@@ -2112,9 +2155,6 @@ io.on(
             startAt:
               null,
 
-            clipFilename:
-              null,
-
             roundFinished:
               false,
 
@@ -2125,25 +2165,35 @@ io.on(
               null
           };
 
+
           parties.set(
             code,
             party
           );
 
+
           socket.join(
             code
           );
 
-          socket.emit(
-            "partyCreated",
+
+          const state =
             publicParty(
               party
-            )
+            );
+
+
+          socket.emit(
+            "partyCreated",
+            state
           );
 
+
+          // Tell every player in the party.
           broadcastParty(
             party
           );
+
 
           console.log(
             `Party ${code} created by ${name} (${rounds} rounds)`
@@ -2166,9 +2216,9 @@ io.on(
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // JOIN PARTY
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "joinParty",
@@ -2179,12 +2229,14 @@ io.on(
               data?.name || ""
             ).trim();
 
+
           const code =
             String(
               data?.code || ""
             )
               .trim()
               .toUpperCase();
+
 
           if (!name) {
             return socket.emit(
@@ -2196,9 +2248,8 @@ io.on(
             );
           }
 
-          if (
-            name.length > 20
-          ) {
+
+          if (name.length > 20) {
             return socket.emit(
               "errorMessage",
               {
@@ -2207,6 +2258,7 @@ io.on(
               }
             );
           }
+
 
           if (!code) {
             return socket.emit(
@@ -2218,10 +2270,12 @@ io.on(
             );
           }
 
+
           const party =
             parties.get(
               code
             );
+
 
           if (!party) {
             return socket.emit(
@@ -2233,9 +2287,8 @@ io.on(
             );
           }
 
-          if (
-            party.started
-          ) {
+
+          if (party.started) {
             return socket.emit(
               "errorMessage",
               {
@@ -2244,6 +2297,7 @@ io.on(
               }
             );
           }
+
 
           if (
             party.players.length >=
@@ -2258,6 +2312,7 @@ io.on(
             );
           }
 
+
           const duplicateName =
             party.players.some(
               p =>
@@ -2265,9 +2320,8 @@ io.on(
                 name.toLowerCase()
             );
 
-          if (
-            duplicateName
-          ) {
+
+          if (duplicateName) {
             return socket.emit(
               "errorMessage",
               {
@@ -2276,6 +2330,7 @@ io.on(
               }
             );
           }
+
 
           party.players.push({
             id:
@@ -2299,10 +2354,13 @@ io.on(
               null
           });
 
+
           socket.join(
             code
           );
 
+
+          // Send the complete party to the new player.
           socket.emit(
             "partyJoined",
             publicParty(
@@ -2310,9 +2368,14 @@ io.on(
             )
           );
 
+
+          // IMPORTANT:
+          // Send the updated player list to EVERYONE,
+          // including the host and all existing players.
           broadcastParty(
             party
           );
+
 
           console.log(
             `${name} joined party ${code}`
@@ -2335,9 +2398,9 @@ io.on(
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // START PARTY
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "startParty",
@@ -2346,6 +2409,7 @@ io.on(
           findPlayer(
             socket.id
           );
+
 
         if (!found) {
           return socket.emit(
@@ -2357,9 +2421,11 @@ io.on(
           );
         }
 
+
         const {
           party
         } = found;
+
 
         if (
           party.hostId !==
@@ -2374,14 +2440,15 @@ io.on(
           );
         }
 
-        if (
-          party.started
-        ) {
+
+        if (party.started) {
           return;
         }
 
+
         const ready =
           getReadyVideos();
+
 
         if (
           ready.length <
@@ -2395,6 +2462,7 @@ io.on(
             }
           );
         }
+
 
         party.started =
           true;
@@ -2411,9 +2479,12 @@ io.on(
         party.usedVideoIds =
           [];
 
+
+        // Tell everyone immediately that the game is starting.
         broadcastParty(
           party
         );
+
 
         startNextRound(
           party
@@ -2422,9 +2493,9 @@ io.on(
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // SUBMIT ANSWER
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "submitAnswer",
@@ -2434,14 +2505,17 @@ io.on(
             socket.id
           );
 
+
         if (!found) {
           return;
         }
+
 
         const {
           party,
           player
         } = found;
+
 
         if (
           !party.started ||
@@ -2451,16 +2525,17 @@ io.on(
           return;
         }
 
-        if (
-          player.answered
-        ) {
+
+        if (player.answered) {
           return;
         }
+
 
         const choiceId =
           String(
             data?.choiceId || ""
           );
+
 
         const validChoice =
           party.choices.some(
@@ -2468,6 +2543,7 @@ io.on(
               choice.id ===
               choiceId
           );
+
 
         if (!validChoice) {
           return socket.emit(
@@ -2479,20 +2555,25 @@ io.on(
           );
         }
 
+
         player.answered =
           true;
 
         player.answerId =
           choiceId;
 
+
         const correct =
           choiceId ===
           party.answerId;
 
+
         player.correct =
           correct;
 
+
         let points = 0;
+
 
         if (correct) {
           const correctCount =
@@ -2501,6 +2582,7 @@ io.on(
                 p.correct
             ).length;
 
+
           points =
             Math.max(
               5 -
@@ -2508,17 +2590,28 @@ io.on(
               0
             );
 
+
           party.answerOrder.push(
             player.id
           );
         }
 
+
         player.pointsThisRound =
           points;
+
 
         player.score +=
           points;
 
+
+        const players =
+          party.players.map(
+            publicPlayer
+          );
+
+
+        // Send the answer result to the player who answered.
         socket.emit(
           "answerAccepted",
           {
@@ -2526,14 +2619,30 @@ io.on(
 
             points,
 
+            score:
+              player.score,
+
+            totalScore:
+              player.score,
+
             roundNumber:
-              party.roundNumber
+              party.roundNumber,
+
+            players,
+
+            scoreboard:
+              players
           }
         );
 
+
+        // IMPORTANT:
+        // Send the NEW scores and answered states
+        // to every player in the party.
         broadcastParty(
           party
         );
+
 
         const allAnswered =
           party.players.every(
@@ -2541,9 +2650,8 @@ io.on(
               p.answered
           );
 
-        if (
-          allAnswered
-        ) {
+
+        if (allAnswered) {
           finishRound(
             party,
             "allAnswered"
@@ -2553,23 +2661,137 @@ io.on(
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // LEAVE PARTY
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "leaveParty",
-      () => {
-        removePlayer(
-          socket
+      data => {
+        const partyCodeToLeave =
+          String(
+            data?.code ||
+            data?.partyCode ||
+            ""
+          )
+            .trim()
+            .toUpperCase();
+
+
+        if (!partyCodeToLeave) {
+          return;
+        }
+
+
+        const party =
+          parties.get(
+            partyCodeToLeave
+          );
+
+
+        if (!party) {
+          return;
+        }
+
+
+        party.players =
+          party.players.filter(
+            player =>
+              player.id !==
+              socket.id
+          );
+
+
+        socket.leave(
+          partyCodeToLeave
+        );
+
+
+        if (
+          party.hostId ===
+          socket.id
+        ) {
+          party.hostId =
+            party.players[0]?.id ||
+            null;
+
+
+          if (party.hostId) {
+            io.to(
+              party.code
+            ).emit(
+              "hostChanged",
+              {
+                hostId:
+                  party.hostId
+              }
+            );
+          }
+        }
+
+
+        if (
+          party.roundTimer
+        ) {
+          clearTimeout(
+            party.roundTimer
+          );
+
+          party.roundTimer =
+            null;
+        }
+
+
+        if (
+          party.players.length ===
+          0
+        ) {
+          parties.delete(
+            partyCodeToLeave
+          );
+
+          console.log(
+            `Party ${partyCodeToLeave} deleted because everyone left`
+          );
+
+          return;
+        }
+
+
+        if (
+          party.started &&
+          !party.gameFinished &&
+          !party.roundFinished &&
+          party.players.every(
+            player =>
+              player.answered
+          )
+        ) {
+          finishRound(
+            party,
+            "allAnswered"
+          );
+
+          return;
+        }
+
+
+        // Send the new player list to everyone remaining.
+        broadcastParty(
+          party
+        );
+
+
+        console.log(
+          `Socket ${socket.id} left party ${partyCodeToLeave}`
         );
       }
     );
 
 
-    // --------------------------------------------------------
+    // ========================================================
     // DISCONNECT
-    // --------------------------------------------------------
+    // ========================================================
 
     socket.on(
       "disconnect",
@@ -2591,21 +2813,22 @@ io.on(
 // REMOVE PLAYER
 // ============================================================
 
-function removePlayer(
-  socket
-) {
+function removePlayer(socket) {
   const found =
     findPlayer(
       socket.id
     );
 
+
   if (!found) {
     return;
   }
 
+
   const {
     party
   } = found;
+
 
   party.players =
     party.players.filter(
@@ -2614,23 +2837,18 @@ function removePlayer(
         socket.id
     );
 
+
+  // ----------------------------------------------------------
+  // Party empty
+  // ----------------------------------------------------------
+
   if (
     party.players.length ===
     0
   ) {
-    if (
-      party.roundTimer
-    ) {
+    if (party.roundTimer) {
       clearTimeout(
         party.roundTimer
-      );
-    }
-
-    if (
-      party.clipFilename
-    ) {
-      deleteTemporaryClip(
-        party.clipFilename
       );
     }
 
@@ -2645,12 +2863,18 @@ function removePlayer(
     return;
   }
 
+
+  // ----------------------------------------------------------
+  // Host left
+  // ----------------------------------------------------------
+
   if (
     party.hostId ===
     socket.id
   ) {
     party.hostId =
       party.players[0].id;
+
 
     io.to(
       party.code
@@ -2662,6 +2886,11 @@ function removePlayer(
       }
     );
   }
+
+
+  // ----------------------------------------------------------
+  // Everyone remaining has answered
+  // ----------------------------------------------------------
 
   if (
     party.started &&
@@ -2676,8 +2905,12 @@ function removePlayer(
       party,
       "allAnswered"
     );
+
+    return;
   }
 
+
+  // Send updated player list.
   broadcastParty(
     party
   );
