@@ -41,37 +41,167 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 
 // ============================================================
+// ENVIRONMENT
+// ============================================================
+
+// Set APP_ENV=local on your PC.
+// Render should use APP_ENV=production.
+//
+// Local:
+//   YouTube -> local processing -> backup/
+//
+// Production:
+//   YouTube -> processing -> R2 + Supabase
+
+const APP_ENV =
+  process.env.APP_ENV || "production";
+
+const IS_LOCAL =
+  APP_ENV === "local";
+
+console.log(
+  `Application environment: ${APP_ENV}`
+);
+
+// ============================================================
 // PATHS
 // ============================================================
 
 const ROOT = __dirname;
-const DATA = path.join(ROOT, "data");
-const AUDIO = path.join(DATA, "audio");
-const VIDEOS = path.join(DATA, "videos");
-const PUBLIC = path.join(ROOT, "public");
 
-fs.mkdirSync(DATA, { recursive: true });
-fs.mkdirSync(AUDIO, { recursive: true });
-fs.mkdirSync(VIDEOS, { recursive: true });
+const DATA =
+  path.join(
+    ROOT,
+    "data"
+  );
 
-const secretCookies = "/etc/secrets/youtube-cookies.txt";
-const writableCookies = "/tmp/youtube-cookies.txt";
+const AUDIO =
+  path.join(
+    DATA,
+    "audio"
+  );
 
-if (fs.existsSync(secretCookies)) {
-    fs.copyFileSync(secretCookies, writableCookies);
+const VIDEOS =
+  path.join(
+    DATA,
+    "videos"
+  );
+
+const PUBLIC =
+  path.join(
+    ROOT,
+    "public"
+  );
+
+// Local staging/backup directory.
+// These files are NOT part of the live database.
+
+const BACKUP =
+  path.join(
+    ROOT,
+    "backup"
+  );
+
+const BACKUP_AUDIO =
+  path.join(
+    BACKUP,
+    "audio"
+  );
+
+const BACKUP_VIDEOS_JSON =
+  path.join(
+    BACKUP,
+    "videos.json"
+  );
+
+fs.mkdirSync(
+  DATA,
+  {
+    recursive: true
+  }
+);
+
+fs.mkdirSync(
+  AUDIO,
+  {
+    recursive: true
+  }
+);
+
+fs.mkdirSync(
+  VIDEOS,
+  {
+    recursive: true
+  }
+);
+
+if (IS_LOCAL) {
+  fs.mkdirSync(
+    BACKUP,
+    {
+      recursive: true
+    }
+  );
+
+  fs.mkdirSync(
+    BACKUP_AUDIO,
+    {
+      recursive: true
+    }
+  );
 }
 
 // ============================================================
-// ENVIRONMENT
+// YOUTUBE COOKIES
 // ============================================================
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+// Render secret
+const secretCookies =
+  "/etc/secrets/youtube-cookies.txt";
+
+const writableCookies =
+  "/tmp/youtube-cookies.txt";
+
+if (
+  !IS_LOCAL &&
+  fs.existsSync(secretCookies)
+) {
+  fs.copyFileSync(
+    secretCookies,
+    writableCookies
+  );
+}
+
+function youtubeArgs(args) {
+  if (IS_LOCAL) {
+    return [
+      "--cookies-from-browser",
+      "firefox",
+      ...args
+    ];
+  }
+
+  return [
+    "--cookies",
+    writableCookies,
+    ...args
+  ];
+}
+
+// ============================================================
+// ENVIRONMENT VARIABLES
+// ============================================================
+
+const ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD;
 
 // ============================================================
 // SUPABASE
 // ============================================================
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_URL =
+  process.env.SUPABASE_URL;
+
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -86,10 +216,18 @@ if (
   process.exit(1);
 }
 
-const supabase = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase =
+  createClient(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY
+  );
+
+// IMPORTANT:
+//
+// videoDb ONLY contains data from Supabase.
+//
+// Local backup videos are deliberately NOT
+// added to this array.
 
 let videoDb = [];
 
@@ -122,90 +260,132 @@ if (
   process.exit(1);
 }
 
-const r2 = new S3Client({
-  region: "auto",
+const r2 =
+  new S3Client({
+    region: "auto",
 
-  endpoint:
-    `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    endpoint:
+      `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
 
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY
-  }
-});
+    credentials: {
+      accessKeyId:
+        R2_ACCESS_KEY_ID,
+
+      secretAccessKey:
+        R2_SECRET_ACCESS_KEY
+    }
+  });
 
 // ============================================================
 // MIDDLEWARE
 // ============================================================
 
-app.use(express.json());
-
 app.use(
-  express.static(PUBLIC)
+  express.json()
 );
 
-// IMPORTANT:
-// Do NOT expose the local audio directory anymore.
-// Audio is served through signed R2 URLs.
+app.use(
+  express.static(
+    PUBLIC
+  )
+);
+
+// Do NOT expose:
 //
-// app.use("/audio", express.static(AUDIO));
+// data/audio
+// backup
+//
+// The local backup contains unpublished
+// content and must never be publicly accessible.
 
 // ============================================================
 // SUPABASE HELPERS
 // ============================================================
 
-function getAudioKey(id) {
+function getAudioKey(
+  id
+) {
   return `audio/${id}.mp3`;
 }
 
-function fromSupabase(row) {
+function fromSupabase(
+  row
+) {
   return {
-    id: row.id,
+    id:
+      row.id,
 
-    title: row.title,
+    title:
+      row.title,
 
-    channel: row.channel || "",
+    channel:
+      row.channel || "",
 
     duration:
-      Number(row.duration) || 0,
+      Number(
+        row.duration
+      ) || 0,
 
     goodSections:
-      Array.isArray(row.good_sections)
+      Array.isArray(
+        row.good_sections
+      )
         ? row.good_sections
         : [],
 
     ready:
-      Boolean(row.ready),
+      Boolean(
+        row.ready
+      ),
 
     createdAt:
       row.created_at,
 
-    // Keep the database value if present.
-    // Old records may contain /audio/... but
-    // actual playback always uses getAudioUrl().
     audioUrl:
       row.audio_url ||
-      getAudioKey(row.id)
+      getAudioKey(
+        row.id
+      )
   };
 }
+
+// ============================================================
+// LOAD ONLINE DATABASE
+// ============================================================
+//
+// IMPORTANT:
+//
+// This ONLY loads Supabase.
+//
+// backup/videos.json is NOT loaded here.
+//
+// Therefore unpublished local videos never
+// appear in the game or admin video list.
+//
 
 async function loadDb() {
   const {
     data,
     error
-  } = await supabase
-    .from("videos")
-    .select("*")
-    .order("created_at", {
-      ascending: true
-    });
+  } =
+    await supabase
+      .from("videos")
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending: true
+        }
+      );
 
   if (error) {
     throw error;
   }
 
   videoDb =
-    (data || []).map(fromSupabase);
+    (data || []).map(
+      fromSupabase
+    );
 
   console.log(
     `Loaded ${videoDb.length} videos from Supabase.`
@@ -218,9 +398,22 @@ function readDb() {
   return videoDb;
 }
 
-async function insertVideo(video) {
+// ============================================================
+// SUPABASE WRITE HELPERS
+// ============================================================
+//
+// These are ONLY called in production mode from
+// the normal admin upload flow.
+//
+// Local mode does not call these.
+//
+
+async function insertVideo(
+  video
+) {
   const row = {
-    id: video.id,
+    id:
+      video.id,
 
     title:
       video.title ||
@@ -230,15 +423,21 @@ async function insertVideo(video) {
       video.channel || "",
 
     duration:
-      Number(video.duration) || 0,
+      Number(
+        video.duration
+      ) || 0,
 
     good_sections:
-      Array.isArray(video.goodSections)
+      Array.isArray(
+        video.goodSections
+      )
         ? video.goodSections
         : [],
 
     ready:
-      Boolean(video.ready),
+      Boolean(
+        video.ready
+      ),
 
     created_at:
       video.createdAt ||
@@ -246,26 +445,33 @@ async function insertVideo(video) {
 
     audio_url:
       video.audioUrl ||
-      getAudioKey(video.id)
+      getAudioKey(
+        video.id
+      )
   };
 
   const {
     data,
     error
-  } = await supabase
-    .from("videos")
-    .insert(row)
-    .select()
-    .single();
+  } =
+    await supabase
+      .from("videos")
+      .insert(row)
+      .select()
+      .single();
 
   if (error) {
     throw error;
   }
 
   const result =
-    fromSupabase(data);
+    fromSupabase(
+      data
+    );
 
-  videoDb.push(result);
+  videoDb.push(
+    result
+  );
 
   return result;
 }
@@ -277,95 +483,121 @@ async function updateVideo(
   const payload = {};
 
   if (
-    updates.title !== undefined
+    updates.title !==
+    undefined
   ) {
     payload.title =
       updates.title;
   }
 
   if (
-    updates.channel !== undefined
+    updates.channel !==
+    undefined
   ) {
     payload.channel =
       updates.channel;
   }
 
   if (
-    updates.duration !== undefined
+    updates.duration !==
+    undefined
   ) {
     payload.duration =
-      Number(updates.duration) || 0;
+      Number(
+        updates.duration
+      ) || 0;
   }
 
   if (
-    updates.goodSections !== undefined
+    updates.goodSections !==
+    undefined
   ) {
     payload.good_sections =
-      Array.isArray(updates.goodSections)
+      Array.isArray(
+        updates.goodSections
+      )
         ? updates.goodSections
         : [];
   }
 
   if (
-    updates.ready !== undefined
+    updates.ready !==
+    undefined
   ) {
     payload.ready =
-      Boolean(updates.ready);
+      Boolean(
+        updates.ready
+      );
   }
 
   if (
-    updates.audioUrl !== undefined
+    updates.audioUrl !==
+    undefined
   ) {
     payload.audio_url =
       updates.audioUrl;
   }
 
   if (
-    payload.audio_url === undefined
+    payload.audio_url ===
+    undefined
   ) {
     payload.audio_url =
-      getAudioKey(id);
+      getAudioKey(
+        id
+      );
   }
 
   const {
     data,
     error
-  } = await supabase
-    .from("videos")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
+  } =
+    await supabase
+      .from("videos")
+      .update(payload)
+      .eq("id", id)
+      .select()
+      .single();
 
   if (error) {
     throw error;
   }
 
   const updated =
-    fromSupabase(data);
+    fromSupabase(
+      data
+    );
 
   const index =
     videoDb.findIndex(
-      v => v.id === id
+      v =>
+        v.id === id
     );
 
-  if (index !== -1) {
+  if (
+    index !== -1
+  ) {
     videoDb[index] =
       updated;
   } else {
-    videoDb.push(updated);
+    videoDb.push(
+      updated
+    );
   }
 
   return updated;
 }
 
-async function deleteVideoFromDb(id) {
+async function deleteVideoFromDb(
+  id
+) {
   const {
     error
-  } = await supabase
-    .from("videos")
-    .delete()
-    .eq("id", id);
+  } =
+    await supabase
+      .from("videos")
+      .delete()
+      .eq("id", id);
 
   if (error) {
     throw error;
@@ -373,7 +605,198 @@ async function deleteVideoFromDb(id) {
 
   videoDb =
     videoDb.filter(
-      v => v.id !== id
+      v =>
+        v.id !== id
+    );
+}
+
+// ============================================================
+// LOCAL BACKUP HELPERS
+// ============================================================
+
+function readBackupVideos() {
+  if (
+    !fs.existsSync(
+      BACKUP_VIDEOS_JSON
+    )
+  ) {
+    return [];
+  }
+
+  try {
+    const content =
+      fs.readFileSync(
+        BACKUP_VIDEOS_JSON,
+        "utf8"
+      );
+
+    if (
+      !content.trim()
+    ) {
+      return [];
+    }
+
+    const data =
+      JSON.parse(
+        content
+      );
+
+    if (
+      !Array.isArray(data)
+    ) {
+      throw new Error(
+        "backup/videos.json must contain an array."
+      );
+    }
+
+    return data;
+  } catch (
+    error
+  ) {
+    throw new Error(
+      `Could not read backup/videos.json: ${error.message}`
+    );
+  }
+}
+
+function writeBackupVideos(
+  videos
+) {
+  fs.mkdirSync(
+    BACKUP,
+    {
+      recursive: true
+    }
+  );
+
+  fs.mkdirSync(
+    BACKUP_AUDIO,
+    {
+      recursive: true
+    }
+  );
+
+  const tempFile =
+    `${BACKUP_VIDEOS_JSON}.tmp`;
+
+  fs.writeFileSync(
+    tempFile,
+    JSON.stringify(
+      videos,
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  fs.renameSync(
+    tempFile,
+    BACKUP_VIDEOS_JSON
+  );
+}
+
+function saveBackupVideo(
+  video
+) {
+  const videos =
+    readBackupVideos();
+
+  const index =
+    videos.findIndex(
+      item =>
+        item.id ===
+        video.id
+    );
+
+  const backupVideo = {
+    id:
+      video.id,
+
+    title:
+      video.title ||
+      `YouTube video ${video.id}`,
+
+    channel:
+      video.channel || "",
+
+    duration:
+      Number(
+        video.duration
+      ) || 0,
+
+    goodSections:
+      Array.isArray(
+        video.goodSections
+      )
+        ? video.goodSections
+        : [],
+
+    ready:
+      true,
+
+    createdAt:
+      video.createdAt ||
+      new Date().toISOString(),
+
+    // This is the future R2 key.
+    audioUrl:
+      getAudioKey(
+        video.id
+      )
+  };
+
+  if (
+    index === -1
+  ) {
+    videos.push(
+      backupVideo
+    );
+  } else {
+    videos[index] =
+      backupVideo;
+  }
+
+  writeBackupVideos(
+    videos
+  );
+
+  return backupVideo;
+}
+
+function removeBackupVideo(
+  id
+) {
+  const videos =
+    readBackupVideos();
+
+  const filtered =
+    videos.filter(
+      video =>
+        video.id !== id
+    );
+
+  writeBackupVideos(
+    filtered
+  );
+
+  fs.rmSync(
+    path.join(
+      BACKUP_AUDIO,
+      `${id}.mp3`
+    ),
+    {
+      force: true
+    }
+  );
+}
+
+function backupVideoExists(
+  id
+) {
+  return readBackupVideos()
+    .some(
+      video =>
+        video.id === id
     );
 }
 
@@ -386,7 +809,9 @@ async function uploadAudioToR2(
   file
 ) {
   const key =
-    getAudioKey(id);
+    getAudioKey(
+      id
+    );
 
   console.log(
     `Uploading ${id}.mp3 to R2...`
@@ -401,7 +826,9 @@ async function uploadAudioToR2(
         key,
 
       Body:
-        fs.createReadStream(file),
+        fs.createReadStream(
+          file
+        ),
 
       ContentType:
         "audio/mpeg"
@@ -419,7 +846,9 @@ async function deleteAudioFromR2(
   id
 ) {
   const key =
-    getAudioKey(id);
+    getAudioKey(
+      id
+    );
 
   try {
     await r2.send(
@@ -435,7 +864,9 @@ async function deleteAudioFromR2(
     console.log(
       `Deleted ${key} from R2.`
     );
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       `Could not delete ${key} from R2:`,
       error.message
@@ -447,7 +878,9 @@ async function getAudioUrl(
   id
 ) {
   const key =
-    getAudioKey(id);
+    getAudioKey(
+      id
+    );
 
   return getSignedUrl(
     r2,
@@ -549,21 +982,22 @@ async function getDuration(
 ) {
   const {
     stdout
-  } = await command(
-    "ffprobe",
-    [
-      "-v",
-      "error",
+  } =
+    await command(
+      "ffprobe",
+      [
+        "-v",
+        "error",
 
-      "-show_entries",
-      "format=duration",
+        "-show_entries",
+        "format=duration",
 
-      "-of",
-      "default=noprint_wrappers=1:nokey=1",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
 
-      file
-    ]
-  );
+        file
+      ]
+    );
 
   return Number(
     stdout.trim()
@@ -579,33 +1013,34 @@ async function findGoodSections(
   duration
 ) {
   console.log(
-    `Analyzing audio for good sections...`
+    "Analyzing audio for good sections..."
   );
 
   const {
     stdout
-  } = await command(
-    "ffmpeg",
-    [
-      "-hide_banner",
+  } =
+    await command(
+      "ffmpeg",
+      [
+        "-hide_banner",
 
-      "-i",
-      file,
+        "-i",
+        file,
 
-      "-vn",
+        "-vn",
 
-      "-ac",
-      "1",
+        "-ac",
+        "1",
 
-      "-ar",
-      "8000",
+        "-ar",
+        "8000",
 
-      "-f",
-      "s16le",
+        "-f",
+        "s16le",
 
-      "-"
-    ]
-  );
+        "-"
+      ]
+    );
 
   const buffer =
     Buffer.from(
@@ -649,20 +1084,31 @@ async function findGoodSections(
       );
     start += step
   ) {
-    let loudSubWindows = 0;
-    let totalSubWindows = 0;
+    let loudSubWindows =
+      0;
 
-    let peak = 0;
-    let sumSquares = 0;
-    let sampleCount = 0;
+    let totalSubWindows =
+      0;
+
+    let peak =
+      0;
+
+    let sumSquares =
+      0;
+
+    let sampleCount =
+      0;
 
     for (
       let subStart = 0;
-      subStart < windowDuration;
-      subStart += subWindow
+      subStart <
+      windowDuration;
+      subStart +=
+        subWindow
     ) {
       const absoluteStart =
-        start + subStart;
+        start +
+        subStart;
 
       const sampleStart =
         Math.floor(
@@ -683,14 +1129,20 @@ async function findGoodSections(
           )
         );
 
-      let subSumSquares = 0;
-      let subSamples = 0;
-      let subPeak = 0;
+      let subSumSquares =
+        0;
+
+      let subSamples =
+        0;
+
+      let subPeak =
+        0;
 
       for (
         let i =
           sampleStart;
-        i < sampleEnd;
+        i <
+        sampleEnd;
         i++
       ) {
         const offset =
@@ -799,7 +1251,8 @@ async function findGoodSections(
         )
       );
 
-    let score = 0;
+    let score =
+      0;
 
     if (
       loudRatio >= 0.8
@@ -859,7 +1312,9 @@ async function findGoodSections(
       sections.push({
         start:
           Number(
-            start.toFixed(2)
+            start.toFixed(
+              2
+            )
           ),
 
         duration:
@@ -876,13 +1331,12 @@ async function findGoodSections(
       a.score
   );
 
-  // Keep the best sections while
-  // avoiding too many nearly identical
-  // timestamps.
-  const goodSections = [];
+  const goodSections =
+    [];
 
   for (
-    const section of sections
+    const section of
+      sections
   ) {
     const tooClose =
       goodSections.some(
@@ -911,11 +1365,9 @@ async function findGoodSections(
     }
   }
 
-  // If the analysis didn't find enough
-  // sections, fall back to several
-  // random 10-second windows.
   if (
-    goodSections.length === 0
+    goodSections.length ===
+    0
   ) {
     const maxStart =
       Math.max(
@@ -923,7 +1375,8 @@ async function findGoodSections(
         duration - 10
       );
 
-    const fallback = [];
+    const fallback =
+      [];
 
     for (
       let i = 0;
@@ -937,7 +1390,9 @@ async function findGoodSections(
       fallback.push({
         start:
           Number(
-            start.toFixed(2)
+            start.toFixed(
+              2
+            )
           ),
 
         duration:
@@ -947,7 +1402,8 @@ async function findGoodSections(
               start
           ),
 
-        score: 0
+        score:
+          0
       });
     }
 
@@ -1000,21 +1456,20 @@ async function getYoutubeMetadata(
   try {
     const {
       stdout
-    } = await command(
-      "yt-dlp",
-      [
-        "--no-playlist",
+    } =
+      await command(
+        "yt-dlp",
+        youtubeArgs([
+          "--no-playlist",
 
-        "--cookies", "/tmp/youtube-cookies.txt",
+          "--print",
+          "%(title)s\t%(channel)s",
 
-        "--print",
-        "%(title)s\t%(channel)s",
+          "--skip-download",
 
-        "--skip-download",
-
-        `https://www.youtube.com/watch?v=${id}`
-      ]
-    );
+          `https://www.youtube.com/watch?v=${id}`
+        ])
+      );
 
     const [
       title,
@@ -1043,6 +1498,23 @@ async function getYoutubeMetadata(
 // ============================================================
 // PROCESS VIDEO
 // ============================================================
+//
+// IMPORTANT:
+//
+// This function ONLY downloads and processes.
+//
+// It does NOT upload to R2.
+//
+// The caller decides whether the resulting
+// MP3 goes to:
+//
+//   backup/audio/       (local)
+// or
+//   R2                  (production)
+//
+// This means local processing and production
+// use the exact same findGoodSections logic.
+//
 
 async function processVideo(
   id
@@ -1075,10 +1547,8 @@ async function processVideo(
 
   await command(
     "yt-dlp",
-    [
+    youtubeArgs([
       "--no-playlist",
-
-      "--cookies", "/tmp/youtube-cookies.txt",
 
       "-f",
       "bestaudio/best",
@@ -1095,7 +1565,7 @@ async function processVideo(
       outputTemplate,
 
       `https://www.youtube.com/watch?v=${id}`
-    ]
+    ])
   );
 
   if (
@@ -1125,7 +1595,7 @@ async function processVideo(
   }
 
   // ----------------------------------------------------------
-  // ANALYZE
+  // FIND GOOD SECTIONS
   // ----------------------------------------------------------
 
   const goodSections =
@@ -1143,7 +1613,7 @@ async function processVideo(
   }
 
   // ----------------------------------------------------------
-  // CREATE FULL MP3
+  // CREATE MP3
   // ----------------------------------------------------------
 
   console.log(
@@ -1197,16 +1667,9 @@ async function processVideo(
     );
 
   // ----------------------------------------------------------
-  // UPLOAD TO R2
+  // CLEAN WAV
   // ----------------------------------------------------------
 
-  const audioKey =
-    await uploadAudioToR2(
-      id,
-      mp3
-    );
-
-  // WAV is no longer needed.
   fs.rmSync(
     wav,
     {
@@ -1226,8 +1689,8 @@ async function processVideo(
 
     goodSections,
 
-    audioUrl:
-      audioKey
+    mp3Path:
+      mp3
   };
 }
 
@@ -1254,7 +1717,10 @@ const adminSessions =
   new Map();
 
 const ADMIN_SESSION_DURATION =
-  24 * 60 * 60 * 1000;
+  24 *
+  60 *
+  60 *
+  1000;
 
 function parseCookies(
   request
@@ -1276,7 +1742,9 @@ function parseCookies(
       key,
       ...rest
     ] =
-      part.trim().split("=");
+      part
+        .trim()
+        .split("=");
 
     cookies[key] =
       decodeURIComponent(
@@ -1329,7 +1797,9 @@ function requireAdmin(
   next
 ) {
   if (
-    !isAdminAuthenticated(req)
+    !isAdminAuthenticated(
+      req
+    )
   ) {
     return res
       .status(401)
@@ -1361,7 +1831,7 @@ app.post(
     const password =
       String(
         req.body?.password ||
-        ""
+          ""
       );
 
     if (
@@ -1377,9 +1847,11 @@ app.post(
     }
 
     const token =
-      crypto.randomBytes(
-        32
-      ).toString("hex");
+      crypto
+        .randomBytes(
+          32
+        )
+        .toString("hex");
 
     adminSessions.set(
       token,
@@ -1393,7 +1865,9 @@ app.post(
     res.setHeader(
       "Set-Cookie",
       [
-        `admin_session=${encodeURIComponent(token)}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(
+        `admin_session=${encodeURIComponent(
+          token
+        )}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(
           ADMIN_SESSION_DURATION /
             1000
         )}`
@@ -1446,7 +1920,9 @@ app.get(
   "/admin.html",
   (req, res) => {
     if (
-      !isAdminAuthenticated(req)
+      !isAdminAuthenticated(
+        req
+      )
     ) {
       return res.redirect(
         "/"
@@ -1463,8 +1939,15 @@ app.get(
 );
 
 // ============================================================
-// GET VIDEOS
+// GET ONLINE VIDEOS
 // ============================================================
+//
+// This is deliberately ONLY videoDb.
+//
+// videoDb comes from Supabase.
+//
+// Local backup videos are NOT returned.
+//
 
 app.get(
   "/api/videos",
@@ -1503,10 +1986,14 @@ app.get(
 app.post(
   "/api/videos",
   requireAdmin,
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const id =
       videoIdFromUrl(
-        req.body?.url || ""
+        req.body?.url ||
+          ""
       );
 
     if (!id) {
@@ -1518,68 +2005,264 @@ app.post(
         });
     }
 
-    // Supabase is the source of truth.
-    // Do NOT check local files because
-    // local files may not exist on Render.
-    const db =
-      readDb();
+    // ========================================================
+    // DUPLICATE CHECK
+    // ========================================================
+    //
+    // Always check the ONLINE database.
+    //
+    // In local mode, also check backup/videos.json so
+    // you cannot accidentally process the same unpublished
+    // video twice.
 
-    const alreadyExists =
-      db.some(
+    const alreadyOnline =
+      readDb().some(
         video =>
           video.id === id
       );
 
     if (
-      alreadyExists
+      alreadyOnline
     ) {
       return res
         .status(409)
         .json({
           error:
-            "This video is already in the list."
+            "This video is already in the online list."
         });
     }
 
-    const item = {
-      id,
+    if (
+      IS_LOCAL &&
+      backupVideoExists(id)
+    ) {
+      return res
+        .status(409)
+        .json({
+          error:
+            "This video is already in the local backup."
+        });
+    }
 
-      title:
-        "Processing…",
+    let result =
+      null;
 
-      channel:
-        "",
-
-      duration:
-        0,
-
-      goodSections:
-        [],
-
-      ready:
-        false,
-
-      createdAt:
-        new Date().toISOString(),
-
-      audioUrl:
-        getAudioKey(id)
-    };
+    let localBackupSaved =
+      false;
 
     try {
-      // Insert processing placeholder.
-      await insertVideo(
-        item
-      );
-
       console.log(
         `Processing video ${id}...`
       );
 
-      const result =
+      // ======================================================
+      // PROCESS LOCALLY
+      // ======================================================
+      //
+      // This does:
+      //
+      // YouTube download
+      //      ↓
+      // WAV
+      //      ↓
+      // findGoodSections()
+      //      ↓
+      // normalized MP3
+      //
+      // Nothing is uploaded yet.
+
+      result =
         await processVideo(
           id
         );
+
+      // ======================================================
+      // LOCAL MODE
+      // ======================================================
+
+      if (IS_LOCAL) {
+        const backupMp3 =
+          path.join(
+            BACKUP_AUDIO,
+            `${id}.mp3`
+          );
+
+        // Copy processed MP3 into backup.
+        fs.copyFileSync(
+          result.mp3Path,
+          backupMp3
+        );
+
+        const backupVideo =
+          saveBackupVideo({
+            id,
+
+            title:
+              result.title,
+
+            channel:
+              result.channel,
+
+            duration:
+              result.duration,
+
+            goodSections:
+              result.goodSections,
+
+            ready:
+              true,
+
+            createdAt:
+              new Date().toISOString(),
+
+            audioUrl:
+              getAudioKey(
+                id
+              )
+          });
+
+        localBackupSaved =
+          true;
+
+        // Remove temporary MP3 from data/audio.
+        fs.rmSync(
+          result.mp3Path,
+          {
+            force: true
+          }
+        );
+
+        console.log(
+          ""
+        );
+
+        console.log(
+          `LOCAL VIDEO READY: ${id}`
+        );
+
+        console.log(
+          `MP3: ${backupMp3}`
+        );
+
+        console.log(
+          `Metadata: ${BACKUP_VIDEOS_JSON}`
+        );
+
+        console.log(
+          "NOT uploaded to Supabase."
+        );
+
+        console.log(
+          "NOT uploaded to R2."
+        );
+
+        console.log(
+          "Run: node backup.js upload"
+        );
+
+        console.log(
+          ""
+        );
+
+        // IMPORTANT:
+        //
+        // Do NOT push to videoDb.
+        //
+        // Therefore the game and admin list do NOT
+        // see this video until backup.js uploads it.
+
+        return res
+          .status(201)
+          .json({
+            success:
+              true,
+
+            local:
+              true,
+
+            published:
+              false,
+
+            id:
+              backupVideo.id,
+
+            title:
+              backupVideo.title,
+
+            channel:
+              backupVideo.channel,
+
+            duration:
+              backupVideo.duration,
+
+            goodSections:
+              backupVideo.goodSections,
+
+            message:
+              "Video processed and saved to local backup. Run `node backup.js upload` to publish it."
+          });
+      }
+
+      // ======================================================
+      // PRODUCTION MODE
+      // ======================================================
+      //
+      // Production keeps the original behavior:
+      //
+      // Supabase placeholder
+      //      ↓
+      // process
+      //      ↓
+      // R2
+      //      ↓
+      // Supabase ready=true
+
+      const item = {
+        id,
+
+        title:
+          "Processing…",
+
+        channel:
+          "",
+
+        duration:
+          0,
+
+        goodSections:
+          [],
+
+        ready:
+          false,
+
+        createdAt:
+          new Date().toISOString(),
+
+        audioUrl:
+          getAudioKey(
+            id
+          )
+      };
+
+      // Insert placeholder.
+      await insertVideo(
+        item
+      );
+
+      // Upload processed MP3.
+      const audioKey =
+        await uploadAudioToR2(
+          id,
+          result.mp3Path
+        );
+
+      // Remove temporary MP3.
+      fs.rmSync(
+        result.mp3Path,
+        {
+          force: true
+        }
+      );
 
       const updated =
         await updateVideo(
@@ -1598,16 +2281,18 @@ app.post(
               result.goodSections,
 
             audioUrl:
-              result.audioUrl,
+              audioKey,
 
             ready:
               true
           }
         );
 
-      res
+      return res
         .status(201)
-        .json(updated);
+        .json(
+          updated
+        );
     } catch (
       error
     ) {
@@ -1616,13 +2301,70 @@ app.post(
         error
       );
 
-      // Clean up R2 in case the upload
-      // succeeded but something afterwards failed.
+      // ======================================================
+      // LOCAL CLEANUP
+      // ======================================================
+
+      if (
+        IS_LOCAL
+      ) {
+        if (
+          result?.mp3Path
+        ) {
+          fs.rmSync(
+            result.mp3Path,
+            {
+              force: true
+            }
+          );
+        }
+
+        fs.rmSync(
+          path.join(
+            VIDEOS,
+            `${id}.wav`
+          ),
+          {
+            force: true
+          }
+        );
+
+        if (
+          localBackupSaved
+        ) {
+          try {
+            removeBackupVideo(
+              id
+            );
+          } catch (
+            cleanupError
+          ) {
+            console.error(
+              "Could not clean up local backup:",
+              cleanupError
+            );
+          }
+        }
+
+        return res
+          .status(500)
+          .json({
+            error:
+              `Processing failed: ${error.message}`,
+
+            hint:
+              "Make sure yt-dlp, ffmpeg and ffprobe are installed and available in PATH."
+          });
+      }
+
+      // ======================================================
+      // PRODUCTION CLEANUP
+      // ======================================================
+
       await deleteAudioFromR2(
         id
       );
 
-      // Remove local files.
       fs.rmSync(
         path.join(
           AUDIO,
@@ -1676,7 +2418,7 @@ app.post(
         );
       }
 
-      res
+      return res
         .status(500)
         .json({
           error:
@@ -1696,22 +2438,62 @@ app.post(
 app.delete(
   "/api/videos/:id",
   requireAdmin,
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     const id =
       req.params.id;
 
     try {
-      // Delete R2 object first.
+      // ------------------------------------------------------
+      // LOCAL MODE
+      // ------------------------------------------------------
+      //
+      // Never delete online Supabase/R2 data from local mode.
+      //
+      // If a staged backup video exists, it can be removed
+      // from the local backup.
+
+      if (IS_LOCAL) {
+        if (
+          backupVideoExists(
+            id
+          )
+        ) {
+          removeBackupVideo(
+            id
+          );
+
+          return res.json({
+            ok:
+              true,
+
+            local:
+              true
+          });
+        }
+
+        return res
+          .status(403)
+          .json({
+            error:
+              "Local mode cannot delete published online videos."
+          });
+      }
+
+      // ------------------------------------------------------
+      // PRODUCTION MODE
+      // ------------------------------------------------------
+
       await deleteAudioFromR2(
         id
       );
 
-      // Delete database record.
       await deleteVideoFromDb(
         id
       );
 
-      // Remove any old local files.
       for (
         const filename of [
           `${id}.mp3`,
@@ -1740,7 +2522,8 @@ app.delete(
       );
 
       res.json({
-        ok: true
+        ok:
+          true
       });
     } catch (
       error
@@ -1766,7 +2549,10 @@ app.delete(
 
 app.get(
   "/api/game",
-  async (req, res) => {
+  async (
+    req,
+    res
+  ) => {
     try {
       const ready =
         getReadyVideos();
@@ -1820,7 +2606,9 @@ app.get(
           answer.id,
 
         audioUrl,
-        duration: answer.duration,
+
+        duration:
+          answer.duration,
 
         choices
       });
@@ -1886,7 +2674,9 @@ function generatePartyCode() {
         ];
     }
   } while (
-    parties.has(code)
+    parties.has(
+      code
+    )
   );
 
   return code;
@@ -1897,8 +2687,8 @@ function getPartyCode(
 ) {
   return String(
     data?.code ||
-    data?.partyCode ||
-    ""
+      data?.partyCode ||
+      ""
   )
     .trim()
     .toUpperCase();
@@ -1912,7 +2702,10 @@ function sanitizeName(
       name || ""
     )
       .trim()
-      .slice(0, 30);
+      .slice(
+        0,
+        30
+      );
 
   return (
     value ||
@@ -2022,17 +2815,42 @@ async function createMultiplayerRound(
       )
     ];
 
-  const otherChoices = ready
-    .filter(video => video.id !== answer.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 5);
+  const otherChoices =
+    ready
+      .filter(
+        video =>
+          video.id !==
+          answer.id
+      )
+      .sort(
+        () =>
+          Math.random() -
+          0.5
+      )
+      .slice(
+        0,
+        5
+      );
 
-  const choices = [answer, ...otherChoices]
-    .map(video => ({
-      id: video.id,
-      title: video.title
-    }))
-    .sort(() => Math.random() - 0.5);
+  const choices =
+    [
+      answer,
+      ...otherChoices
+    ]
+      .map(
+        video => ({
+          id:
+            video.id,
+
+          title:
+            video.title
+        })
+      )
+      .sort(
+        () =>
+          Math.random() -
+          0.5
+      );
 
   const section =
     pickRandomSection(
@@ -2047,48 +2865,29 @@ async function createMultiplayerRound(
   const roundId =
     crypto.randomUUID();
 
-    const round = {
-      roundNumber: party.roundNumber,
-      totalRounds: party.totalRounds,
-      answerId: answer.id,
-      audioUrl,
-      startTime: section?.start || 0,
-      audioDuration: section?.duration || 10,
-      choices
-    };
+  const round = {
+    roundNumber:
+      party.roundNumber,
 
-    return round;
+    totalRounds:
+      party.totalRounds,
 
-  // return {
-  //   roundId,
+    answerId:
+      answer.id,
 
-  //   answerId:
-  //     answer.id,
+    audioUrl,
 
-  //   audioUrl,
+    startTime:
+      section?.start || 0,
 
-  //   clipStart:
-  //     section?.start || 0,
+    audioDuration:
+      section?.duration ||
+      10,
 
-  //   clipDuration:
-  //     section?.duration ||
-  //     10,
+    choices
+  };
 
-  //   choices,
-
-  //   roundNumber:
-  //     party.roundNumber,
-
-  //   totalRounds:
-  //     party.totalRounds,
-
-  //   duration:
-  //     20,
-
-  //   startAt:
-  //     Date.now() +
-  //     1000
-  // };
+  return round;
 }
 
 // ============================================================
@@ -2255,7 +3054,8 @@ function finishCurrentRound(
     getReadyVideos().find(
       video =>
         video.id ===
-        party.currentRound.answerId
+        party.currentRound
+          .answerId
     );
 
   io.to(
@@ -2270,7 +3070,8 @@ function finishCurrentRound(
         party.totalRounds,
 
       answerId:
-        party.currentRound.answerId,
+        party.currentRound
+          .answerId,
 
       answerTitle:
         answer?.title ||
@@ -2412,7 +3213,7 @@ io.on(
           let rounds =
             Number(
               data?.rounds ??
-              data?.totalRounds
+                data?.totalRounds
             ) || 10;
 
           if (
@@ -2832,16 +3633,18 @@ io.on(
           true;
 
         const correct =
-          answerId !== null &&
+          answerId !==
+            null &&
           String(
             answerId
           ) ===
-          String(
-            party.currentRound
-              .answerId
-          );
+            String(
+              party.currentRound
+                .answerId
+            );
 
-        let points = 0;
+        let points =
+          0;
 
         if (
           correct
@@ -2971,8 +3774,6 @@ io.on(
           return;
         }
 
-        // If the host leaves, transfer
-        // host to another player.
         if (
           party.hostId ===
           socket.id
@@ -3109,6 +3910,12 @@ io.on(
 
 async function startServer() {
   try {
+    // IMPORTANT:
+    //
+    // This loads ONLY Supabase.
+    //
+    // backup/videos.json is deliberately not loaded.
+
     await loadDb();
 
     server.listen(
@@ -3136,12 +3943,26 @@ async function startServer() {
         );
 
         console.log(
-          `Loaded ${videoDb.length} videos`
+          `Environment: ${APP_ENV}`
+        );
+
+        console.log(
+          `Loaded ${videoDb.length} online videos`
         );
 
         console.log(
           `R2 bucket: ${R2_BUCKET_NAME}`
         );
+
+        if (IS_LOCAL) {
+          console.log(
+            `Local backup: ${BACKUP}`
+          );
+
+          console.log(
+            `Run "node backup.js upload" to publish local videos.`
+          );
+        }
 
         console.log(
           ""

@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 data
 
 youtube-cookies.txt
+
+backup
+backup.js
