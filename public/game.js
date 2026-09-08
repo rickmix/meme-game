@@ -3,6 +3,28 @@ const socket = io();
 const $ = (selector) => document.querySelector(selector);
 
 // ============================================================
+// SINGLE PLAYER REVEAL TIMINGS
+// ============================================================
+//
+// Change ONLY this list when you want different reveal times.
+//
+// Example:
+// [0.3, 0.5, 1, 5, 10]
+//
+// The game will automatically progress through the list
+// when the player clicks "I don't know".
+//
+// ============================================================
+
+const SINGLE_REVEAL_TIMINGS = [
+  0.5,
+  1,
+  3,
+  5,
+  10
+];
+
+// ============================================================
 // SINGLE PLAYER DOM
 // ============================================================
 
@@ -100,7 +122,8 @@ const singleState = {
   startTime: 0,
   audioDuration: 0,
 
-  revealDuration: 0.3,
+  revealDuration:
+    SINGLE_REVEAL_TIMINGS[0],
 
   playing: false,
   answered: false,
@@ -295,7 +318,10 @@ function endSinglePlayerGame() {
   singleState.choices = [];
   singleState.startTime = 0;
   singleState.audioDuration = 0;
-  singleState.revealDuration = 0.3;
+
+  singleState.revealDuration =
+    SINGLE_REVEAL_TIMINGS[0];
+
   singleState.playing = false;
   singleState.answered = false;
 
@@ -488,7 +514,9 @@ async function loadSingleRound() {
 
   singleState.round += 1;
   singleState.answered = false;
-  singleState.revealDuration = 0.3;
+
+  singleState.revealDuration =
+    SINGLE_REVEAL_TIMINGS[0];
 
   updateSingleRound();
 
@@ -517,11 +545,17 @@ async function loadSingleRound() {
   }
 
   if (clipTimeEl) {
-    clipTimeEl.textContent = "0.3s";
+    clipTimeEl.textContent =
+      `${formatSeconds(
+        SINGLE_REVEAL_TIMINGS[0]
+      )}s`;
   }
 
   if (durationLabel) {
-    durationLabel.textContent = "0.3s";
+    durationLabel.textContent =
+      `${formatSeconds(
+        SINGLE_REVEAL_TIMINGS[0]
+      )}s`;
   }
 
   if (playBtn) {
@@ -1120,15 +1154,15 @@ function calculateSinglePoints() {
   const seconds =
     singleState.revealDuration;
 
-  if (seconds <= 0.3) {
+  if (seconds <= 0.5) {
     return 1000;
   }
 
-  if (seconds <= 0.5) {
+  if (seconds <= 0.1) {
     return 800;
   }
 
-  if (seconds <= 1) {
+  if (seconds <= 3) {
     return 600;
   }
 
@@ -1170,39 +1204,43 @@ function revealMoreSingle() {
   const actualDuration =
     singleState.audioDuration;
 
+  /*
+   * Find the next timing from the master list.
+   *
+   * Example:
+   *
+   * 0.3 -> 0.5
+   * 0.5 -> 1
+   * 1   -> 5
+   * 5   -> 10
+   */
+  const nextDuration =
+    SINGLE_REVEAL_TIMINGS.find(
+      (value) =>
+        value > currentDuration
+    );
+
+  /*
+   * There is no next timing,
+   * or the whole clip is already revealed.
+   */
   if (
-    currentDuration >= 10 ||
+    !nextDuration ||
     currentDuration >= actualDuration
   ) {
     giveUpSingle();
     return;
   }
 
-  if (currentDuration < 0.5) {
-    singleState.revealDuration =
-      Math.min(
-        0.5,
-        actualDuration
-      );
-  } else if (currentDuration < 1) {
-    singleState.revealDuration =
-      Math.min(
-        1,
-        actualDuration
-      );
-  } else if (currentDuration < 5) {
-    singleState.revealDuration =
-      Math.min(
-        5,
-        actualDuration
-      );
-  } else if (currentDuration < 10) {
-    singleState.revealDuration =
-      Math.min(
-        10,
-        actualDuration
-      );
-  }
+  /*
+   * Never reveal more than the actual
+   * duration of the audio clip.
+   */
+  singleState.revealDuration =
+    Math.min(
+      nextDuration,
+      actualDuration
+    );
 
   updateSingleClipDisplay();
   updateRevealButton();
@@ -1588,11 +1626,17 @@ function resetSingleUI() {
   }
 
   if (clipTimeEl) {
-    clipTimeEl.textContent = "0.3s";
+    clipTimeEl.textContent =
+      `${formatSeconds(
+        SINGLE_REVEAL_TIMINGS[0]
+      )}s`;
   }
 
   if (durationLabel) {
-    durationLabel.textContent = "0.3s";
+    durationLabel.textContent =
+      `${formatSeconds(
+        SINGLE_REVEAL_TIMINGS[0]
+      )}s`;
   }
 
   if (progressEl) {
@@ -1613,13 +1657,13 @@ function resetSingleState() {
 
   singleState.startTime = 0;
   singleState.audioDuration = 0;
-  singleState.revealDuration = 0.3;
+
+  singleState.revealDuration =
+    SINGLE_REVEAL_TIMINGS[0];
 
   singleState.playing = false;
   singleState.answered = false;
   singleState.gameActive = false;
-
-  resetSingleUI();
 }
 
 function updateSingleScore() {
@@ -2037,6 +2081,7 @@ socket.on(
     }
   }
 );
+
 // ============================================================
 // ROUND FINISHED
 // ============================================================
@@ -3170,7 +3215,9 @@ function resetSingleState() {
 
   singleState.startTime = 0;
   singleState.audioDuration = 0;
-  singleState.revealDuration = 0.3;
+
+  singleState.revealDuration =
+    SINGLE_REVEAL_TIMINGS[0];
 
   singleState.playing = false;
   singleState.answered = false;
