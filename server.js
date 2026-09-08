@@ -54,8 +54,6 @@ fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(AUDIO, { recursive: true });
 fs.mkdirSync(VIDEOS, { recursive: true });
 
-const fs = require("fs");
-
 const secretCookies = "/etc/secrets/youtube-cookies.txt";
 const writableCookies = "/tmp/youtube-cookies.txt";
 
