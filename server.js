@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -19,11 +21,30 @@ const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, "public");
 
 const DATA = path.join(ROOT, "data");
-const DB = path.join(DATA, "videos.json");
 const AUDIO = path.join(DATA, "audio");
 const VIDEOS = path.join(DATA, "videos");
 
 const YTDLP = "/usr/local/bin/yt-dlp";
+
+const { createClient } = require("@supabase/supabase-js");
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error(
+    "ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured."
+  );
+  process.exit(1);
+}
+
+const supabase = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
+);
+
+let videoDb = [];
 
 
 // ============================================================
@@ -33,10 +54,6 @@ const YTDLP = "/usr/local/bin/yt-dlp";
 fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(AUDIO, { recursive: true });
 fs.mkdirSync(VIDEOS, { recursive: true });
-
-if (!fs.existsSync(DB)) {
-  fs.writeFileSync(DB, "[]");
-}
 
 app.use(express.json());
 
@@ -266,36 +283,135 @@ app.use(
 
 
 // ============================================================
-// DATABASE
+// DATABASE - SUPABASE
 // ============================================================
 
-function readDb() {
-  try {
-    return JSON.parse(
-      fs.readFileSync(
-        DB,
-        "utf8"
-      )
-    );
-  } catch (error) {
-    console.error(
-      "Could not read database:",
-      error
-    );
-
-    return [];
-  }
+function fromSupabase(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    channel: row.channel || "",
+    duration: Number(row.duration) || 0,
+    goodSections: Array.isArray(row.good_sections)
+      ? row.good_sections
+      : [],
+    ready: Boolean(row.ready),
+    createdAt: row.created_at,
+    audioUrl: row.audio_url || `/audio/${row.id}.mp3`
+  };
 }
 
 
-function writeDb(videos) {
-  fs.writeFileSync(
-    DB,
-    JSON.stringify(
-      videos,
-      null,
-      2
-    )
+async function loadDb() {
+  const { data, error } = await supabase
+    .from("videos")
+    .select("*")
+    .order("created_at", {
+      ascending: true
+    });
+
+  if (error) {
+    throw new Error(
+      `Could not load videos from Supabase: ${error.message}`
+    );
+  }
+
+  videoDb = (data || []).map(fromSupabase);
+
+  console.log(
+    `Loaded ${videoDb.length} videos from Supabase.`
+  );
+}
+
+
+function readDb() {
+  return videoDb;
+}
+
+
+async function insertVideo(video) {
+  const { data, error } = await supabase
+    .from("videos")
+    .insert({
+      id: video.id,
+      title: video.title,
+      channel: video.channel || "",
+      duration: video.duration || 0,
+      good_sections: video.goodSections || [],
+      ready: Boolean(video.ready),
+      created_at: video.createdAt,
+      audio_url:
+        video.audioUrl ||
+        `/audio/${video.id}.mp3`
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Could not insert video into Supabase: ${error.message}`
+    );
+  }
+
+  const converted = fromSupabase(data);
+
+  videoDb.push(converted);
+
+  return converted;
+}
+
+
+async function updateVideo(video) {
+  const { data, error } = await supabase
+    .from("videos")
+    .update({
+      title: video.title,
+      channel: video.channel || "",
+      duration: video.duration || 0,
+      good_sections: video.goodSections || [],
+      ready: Boolean(video.ready),
+      audio_url:
+        video.audioUrl ||
+        `/audio/${video.id}.mp3`
+    })
+    .eq("id", video.id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(
+      `Could not update video in Supabase: ${error.message}`
+    );
+  }
+
+  const converted = fromSupabase(data);
+
+  const index = videoDb.findIndex(
+    v => v.id === video.id
+  );
+
+  if (index !== -1) {
+    videoDb[index] = converted;
+  }
+
+  return converted;
+}
+
+
+async function deleteVideoFromDb(id) {
+  const { error } = await supabase
+    .from("videos")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(
+      `Could not delete video from Supabase: ${error.message}`
+    );
+  }
+
+  videoDb = videoDb.filter(
+    v => v.id !== id
   );
 }
 
@@ -1327,13 +1443,7 @@ app.post(
         new Date().toISOString()
     };
 
-    db.push(
-      item
-    );
-
-    writeDb(
-      db
-    );
+    await insertVideo(item);
 
     try {
       console.log(
@@ -1369,9 +1479,7 @@ app.post(
         }
       );
 
-      writeDb(
-        currentDb
-      );
+      await updateVideo(current);
 
       console.log(
         `Video ${id} is ready!`
@@ -1387,12 +1495,7 @@ app.post(
         e
       );
 
-      writeDb(
-        readDb().filter(
-          v =>
-            v.id !== id
-        )
-      );
+      await deleteVideoFromDb(id);
 
       fs.rmSync(
         path.join(
@@ -1419,16 +1522,11 @@ app.post(
 app.delete(
   "/api/videos/:id",
   requireAdmin,
-  (req, res) => {
+  async (req, res) => {
     const id =
       req.params.id;
 
-    writeDb(
-      readDb().filter(
-        v =>
-          v.id !== id
-      )
-    );
+    await deleteVideoFromDb(id);
 
     fs.rmSync(
       path.join(
@@ -3160,12 +3258,27 @@ function removePlayer(socket) {
 // START SERVER
 // ============================================================
 
-server.listen(
-  PORT,
-  "0.0.0.0",
-  () => {
-    console.log(
-      `\nGuess Game running at http://localhost:${PORT}\n`
+async function startServer() {
+  try {
+    await loadDb();
+
+    server.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log(
+          `\nGuess Game running on port ${PORT}\n`
+        );
+      }
     );
+  } catch (error) {
+    console.error(
+      "Could not start server:",
+      error
+    );
+
+    process.exit(1);
   }
-);
+}
+
+startServer();
