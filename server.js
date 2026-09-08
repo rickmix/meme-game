@@ -404,23 +404,21 @@ async function findGoodSections(audioFile) {
     `Analyzing audio for good sections: ${audioFile}`
   );
 
-  const duration =
-    await getDuration(audioFile);
+  const duration = await getDuration(audioFile);
 
-
-  if (
-    !Number.isFinite(duration) ||
-    duration < 2
-  ) {
+  if (!Number.isFinite(duration) || duration < 2) {
     throw new Error(
       "Audio is shorter than the 2-second minimum."
     );
   }
 
+  // ==========================================================
+  // SHORT AUDIO
+  // ==========================================================
 
-  if (duration < 10) {
+  if (duration <= 10) {
     console.log(
-      `Video is ${duration.toFixed(2)} seconds long. Using the entire video.`
+      `Video is ${duration.toFixed(2)} seconds long. Using the full audio.`
     );
 
     return {
@@ -429,363 +427,604 @@ async function findGoodSections(audioFile) {
       goodSections: [
         {
           start: 0,
-
-          duration:
-            Number(
-              duration.toFixed(2)
-            )
+          duration: Number(duration.toFixed(2))
         }
       ]
     };
   }
 
+  // ==========================================================
+  // CREATE TEMPORARY PCM FILE
+  // ==========================================================
 
-  console.log(
-    "Video is 10+ seconds. Searching for audible 10-second sections..."
+  const path = require("path");
+  const fs = require("fs/promises");
+  const os = require("os");
+  const crypto = require("crypto");
+
+  const tempFile = path.join(
+    os.tmpdir(),
+    `audio-analysis-${crypto.randomUUID()}.pcm`
   );
 
-
-  let result;
+  console.log(
+    "Converting audio for analysis..."
+  );
 
   try {
-    result =
-      await command(
-        "ffmpeg",
-        [
-          "-hide_banner",
+    await command(
+      "ffmpeg",
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
 
-          "-i",
-          audioFile,
+        "-i",
+        audioFile,
 
-          "-af",
-          "silencedetect=noise=-35dB:d=0.35",
+        "-vn",
 
-          "-f",
-          "null",
+        "-ac",
+        "1",
 
-          "-"
-        ]
-      );
-  } catch (error) {
-    result = {
-      stdout:
-        error.stdout || "",
+        "-ar",
+        "8000",
 
-      stderr:
-        error.stderr || ""
-    };
-  }
+        "-f",
+        "s16le",
 
+        "-y",
 
-  const output =
-    `${result.stdout || ""}\n${result.stderr || ""}`;
+        tempFile
+      ]
+    );
 
-  const lines =
-    output.split("\n");
-
-  const silences = [];
-
-  let silenceStart = null;
-
-
-  for (
-    const line
-    of lines
-  ) {
-    const startMatch =
-      line.match(
-        /silence_start:\s*([\d.]+)/
-      );
-
-    const endMatch =
-      line.match(
-        /silence_end:\s*([\d.]+)/
-      );
-
-
-    if (startMatch) {
-      silenceStart =
-        parseFloat(
-          startMatch[1]
-        );
-    }
-
+    const pcm =
+      await fs.readFile(tempFile);
 
     if (
-      endMatch &&
-      silenceStart !== null
+      !Buffer.isBuffer(pcm) ||
+      pcm.length < 2
     ) {
-      const silenceEnd =
-        parseFloat(
-          endMatch[1]
-        );
+      throw new Error(
+        "FFmpeg produced an empty audio analysis file."
+      );
+    }
 
+    console.log(
+      `Audio analysis data: ${(
+        pcm.length /
+        1024 /
+        1024
+      ).toFixed(2)} MB`
+    );
+
+    // ========================================================
+    // PCM SETTINGS
+    // ========================================================
+
+    const SAMPLE_RATE = 8000;
+
+    const BYTES_PER_SAMPLE = 2;
+
+    const totalSamples =
+      Math.floor(
+        pcm.length /
+          BYTES_PER_SAMPLE
+      );
+
+    const samples =
+      new Float32Array(
+        totalSamples
+      );
+
+    for (
+      let i = 0;
+      i < totalSamples;
+      i++
+    ) {
+      samples[i] =
+        pcm.readInt16LE(
+          i * 2
+        ) / 32768;
+    }
+
+    // ========================================================
+    // SETTINGS
+    // ========================================================
+
+    const CLIP_DURATION = 10;
+
+    // Check every 2 seconds.
+    const STEP = 2;
+
+    // Analyze audio in 0.5 second pieces.
+    const WINDOW = 0.5;
+
+    const WINDOW_SAMPLES =
+      Math.floor(
+        SAMPLE_RATE *
+          WINDOW
+      );
+
+    const CLIP_SAMPLES =
+      Math.floor(
+        SAMPLE_RATE *
+          CLIP_DURATION
+      );
+
+    // Anything below this is effectively silence.
+    const SILENCE_THRESHOLD =
+      Math.pow(
+        10,
+        -45 / 20
+      );
+
+    // A 0.5 second window above this is considered audible.
+    const AUDIBLE_RMS =
+      Math.pow(
+        10,
+        -35 / 20
+      );
+
+    // Only 25% of the 10-second clip needs to contain
+    // clearly audible audio.
+    //
+    // Example:
+    //
+    // 3 seconds music
+    // 7 seconds quiet
+    //
+    // = VALID
+    const MIN_GOOD_RATIO = 0.25;
+
+    const candidates = [];
+
+    // ========================================================
+    // ANALYZE 10-SECOND SECTIONS
+    // ========================================================
+
+    for (
+      let startSample = 0;
+
+      startSample +
+          CLIP_SAMPLES <=
+        totalSamples;
+
+      startSample +=
+        SAMPLE_RATE *
+        STEP
+    ) {
+      const endSample =
+        startSample +
+        CLIP_SAMPLES;
+
+      let goodWindows = 0;
+
+      let totalWindows = 0;
+
+      let rmsSum = 0;
+
+      let peak = 0;
+
+      // ------------------------------------------------------
+      // Analyze 0.5-second windows
+      // ------------------------------------------------------
+
+      for (
+        let windowStart =
+          startSample;
+
+        windowStart <
+          endSample;
+
+        windowStart +=
+          WINDOW_SAMPLES
+      ) {
+        const windowEnd =
+          Math.min(
+            windowStart +
+              WINDOW_SAMPLES,
+
+            endSample
+          );
+
+        let sumSquares = 0;
+
+        let count = 0;
+
+        let windowPeak = 0;
+
+        for (
+          let i =
+            windowStart;
+
+          i <
+            windowEnd;
+
+          i++
+        ) {
+          const sample =
+            samples[i];
+
+          const absolute =
+            Math.abs(
+              sample
+            );
+
+          sumSquares +=
+            sample *
+            sample;
+
+          if (
+            absolute >
+            windowPeak
+          ) {
+            windowPeak =
+              absolute;
+          }
+
+          count++;
+        }
+
+        if (count === 0) {
+          continue;
+        }
+
+        const windowRms =
+          Math.sqrt(
+            sumSquares /
+              count
+          );
+
+        rmsSum +=
+          windowRms;
+
+        totalWindows++;
+
+        if (
+          windowPeak >
+          peak
+        ) {
+          peak =
+            windowPeak;
+        }
+
+        // Audible window
+        if (
+          windowRms >=
+          AUDIBLE_RMS
+        ) {
+          goodWindows++;
+        }
+      }
+
+      if (totalWindows === 0) {
+        continue;
+      }
+
+      const goodRatio =
+        goodWindows /
+        totalWindows;
+
+      const averageRms =
+        rmsSum /
+        totalWindows;
+
+      // ------------------------------------------------------
+      // Reject sections that are almost entirely silent
+      // ------------------------------------------------------
 
       if (
-        Number.isFinite(
-          silenceEnd
-        )
+        goodRatio <
+        MIN_GOOD_RATIO
       ) {
-        silences.push({
-          start:
-            silenceStart,
+        continue;
+      }
 
-          end:
-            silenceEnd
+      // ------------------------------------------------------
+      // Convert volume to dB
+      // ------------------------------------------------------
+
+      const rmsDb =
+        20 *
+        Math.log10(
+          Math.max(
+            averageRms,
+            0.000001
+          )
+        );
+
+      const peakDb =
+        20 *
+        Math.log10(
+          Math.max(
+            peak,
+            0.000001
+          )
+        );
+
+      // ------------------------------------------------------
+      // Scores
+      // ------------------------------------------------------
+
+      const volumeScore =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (rmsDb + 45) /
+              25
+          )
+        );
+
+      const audioScore =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            goodRatio
+          )
+        );
+
+      const peakScore =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            (peakDb + 30) /
+              25
+          )
+        );
+
+      const score =
+        audioScore * 0.60 +
+        volumeScore * 0.30 +
+        peakScore * 0.10;
+
+      candidates.push({
+        start: Number(
+          (
+            startSample /
+            SAMPLE_RATE
+          ).toFixed(2)
+        ),
+
+        duration:
+          CLIP_DURATION,
+
+        score,
+
+        goodRatio,
+
+        rmsDb,
+
+        peakDb
+      });
+    }
+
+    console.log(
+      `Found ${candidates.length} usable 10-second sections.`
+    );
+
+    // ========================================================
+    // FALLBACK
+    // ========================================================
+
+    if (
+      candidates.length === 0
+    ) {
+      console.warn(
+        "No sections passed audio analysis. Using random 10-second sections."
+      );
+
+      const fallback = [];
+
+      const maxStart =
+        duration -
+        CLIP_DURATION;
+
+      for (
+        let start = 0;
+
+        start <=
+          maxStart;
+
+        start += STEP
+      ) {
+        fallback.push({
+          start: Number(
+            start.toFixed(2)
+          ),
+
+          duration:
+            CLIP_DURATION
         });
       }
 
+      if (
+        fallback.length === 0
+      ) {
+        fallback.push({
+          start: 0,
+          duration:
+            CLIP_DURATION
+        });
+      }
 
-      silenceStart =
-        null;
-    }
-  }
-
-
-  if (
-    silenceStart !== null &&
-    silenceStart < duration
-  ) {
-    silences.push({
-      start:
-        silenceStart,
-
-      end:
-        duration
-    });
-  }
-
-
-  const audibleSections = [];
-
-  let cursor = 0;
-
-
-  for (
-    const silence
-    of silences
-  ) {
-    if (
-      silence.start >
-      cursor
-    ) {
-      audibleSections.push({
-        start:
-          cursor,
-
-        end:
-          silence.start,
-
-        duration:
-          silence.start -
-          cursor
-      });
-    }
-
-
-    cursor =
-      Math.max(
-        cursor,
-        silence.end
+      fallback.sort(
+        () =>
+          Math.random() -
+          0.5
       );
-  }
 
-
-  if (
-    cursor < duration
-  ) {
-    audibleSections.push({
-      start:
-        cursor,
-
-      end:
+      return {
         duration,
 
-      duration:
-        duration -
-        cursor
-    });
-  }
-
-
-  if (
-    silences.length === 0
-  ) {
-    audibleSections.length = 0;
-
-    audibleSections.push({
-      start: 0,
-
-      end:
-        duration,
-
-      duration
-    });
-  }
-
-
-  console.log(
-    `Found ${audibleSections.length} audible sections.`
-  );
-
-
-  const candidates = [];
-
-
-  for (
-    const section
-    of audibleSections
-  ) {
-    if (
-      section.duration < 10
-    ) {
-      continue;
+        goodSections:
+          fallback.slice(
+            0,
+            Math.min(
+              10,
+              fallback.length
+            )
+          )
+      };
     }
 
+    // ========================================================
+    // SORT BY QUALITY
+    // ========================================================
 
-    const usableDuration =
-      section.duration -
-      10;
+    candidates.sort(
+      (a, b) =>
+        b.score -
+        a.score
+    );
 
+    // ========================================================
+    // SELECT SECTIONS
+    // ========================================================
 
-    if (
-      usableDuration <= 0
-    ) {
-      candidates.push({
-        start:
-          Number(
-            section.start.toFixed(2)
-          ),
+    const selected = [];
 
-        duration: 10
-      });
-
-      continue;
-    }
-
-
-    const STEP = 5;
-
+    const MIN_DISTANCE = 6;
 
     for (
-      let offset = 0;
-      offset <= usableDuration;
-      offset += STEP
+      const candidate of candidates
     ) {
-      const start =
-        section.start +
-        offset;
+      const tooClose =
+        selected.some(
+          existing =>
+            Math.abs(
+              existing.start -
+                candidate.start
+            ) <
+            MIN_DISTANCE
+        );
 
-      candidates.push({
-        start:
-          Number(
-            start.toFixed(2)
-          ),
+      if (tooClose) {
+        continue;
+      }
 
-        duration: 10
-      });
+      selected.push(
+        candidate
+      );
+
+      if (
+        selected.length >=
+        20
+      ) {
+        break;
+      }
     }
 
-
-    const finalStart =
-      section.end - 10;
-
+    // ========================================================
+    // FILL IF NEEDED
+    // ========================================================
 
     if (
-      finalStart >
-      section.start
+      selected.length < 10
     ) {
-      candidates.push({
-        start:
-          Number(
-            finalStart.toFixed(2)
-          ),
+      for (
+        const candidate of candidates
+      ) {
+        if (
+          selected.some(
+            existing =>
+              existing.start ===
+              candidate.start
+          )
+        ) {
+          continue;
+        }
 
-        duration: 10
-      });
+        selected.push(
+          candidate
+        );
+
+        if (
+          selected.length >=
+          10
+        ) {
+          break;
+        }
+      }
+    }
+
+    // ========================================================
+    // SHUFFLE
+    // ========================================================
+
+    const goodSections =
+      selected
+        .map(
+          section => ({
+            start:
+              section.start,
+
+            duration:
+              section.duration
+          })
+        )
+        .sort(
+          () =>
+            Math.random() -
+            0.5
+        );
+
+    console.log(
+      `Selected ${goodSections.length} good sections.`
+    );
+
+    console.log(
+      "Best candidates:",
+      selected
+        .slice(0, 5)
+        .map(
+          section => ({
+            start:
+              section.start,
+
+            score:
+              Number(
+                section.score.toFixed(
+                  3
+                )
+              ),
+
+            audible:
+              `${Math.round(
+                section.goodRatio *
+                  100
+              )}%`,
+
+            rms:
+              `${section.rmsDb.toFixed(
+                1
+              )} dB`
+          })
+        )
+    );
+
+    return {
+      duration,
+      goodSections
+    };
+
+  } finally {
+    // ========================================================
+    // CLEAN UP TEMP FILE
+    // ========================================================
+
+    try {
+      await fs.unlink(
+        tempFile
+      );
+    } catch {
+      // File may already be gone.
     }
   }
-
-
-  const uniqueCandidates =
-    Array.from(
-      new Map(
-        candidates.map(
-          section => [
-            section.start,
-            section
-          ]
-        )
-      ).values()
-    );
-
-
-  uniqueCandidates.sort(
-    () =>
-      Math.random() -
-      0.5
-  );
-
-
-  const MAX_SECTIONS = 30;
-
-  let goodSections =
-    uniqueCandidates.slice(
-      0,
-      MAX_SECTIONS
-    );
-
-
-  if (
-    goodSections.length === 0
-  ) {
-    console.warn(
-      "No suitable audible 10-second sections found. Using fallback."
-    );
-
-
-    const maxStart =
-      duration - 10;
-
-
-    const start =
-      maxStart > 0
-        ? Math.random() *
-          maxStart
-        : 0;
-
-
-    goodSections = [
-      {
-        start:
-          Number(
-            start.toFixed(2)
-          ),
-
-        duration: 10
-      }
-    ];
-  }
-
-
-  goodSections.sort(
-    (a, b) =>
-      a.start -
-      b.start
-  );
-
-
-  console.log(
-    `Found ${goodSections.length} good sections:`,
-    goodSections
-  );
-
-
-  return {
-    duration,
-
-    goodSections
-  };
 }
 
 
