@@ -998,8 +998,8 @@ async function getYoutubeMetadata(
       [
         "--no-playlist",
 
-        "--cookies-from-browser",
-        "firefox",
+        // "--cookies-from-browser",
+        // "firefox",
 
         "--print",
         "%(title)s\t%(channel)s",
@@ -1072,8 +1072,8 @@ async function processVideo(
     [
       "--no-playlist",
 
-      "--cookies-from-browser",
-      "firefox",
+      // "--cookies-from-browser",
+      // "firefox",
 
       "-f",
       "bestaudio/best",
