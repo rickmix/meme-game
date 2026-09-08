@@ -54,6 +54,15 @@ fs.mkdirSync(DATA, { recursive: true });
 fs.mkdirSync(AUDIO, { recursive: true });
 fs.mkdirSync(VIDEOS, { recursive: true });
 
+const fs = require("fs");
+
+const secretCookies = "/etc/secrets/youtube-cookies.txt";
+const writableCookies = "/tmp/youtube-cookies.txt";
+
+if (fs.existsSync(secretCookies)) {
+    fs.copyFileSync(secretCookies, writableCookies);
+}
+
 // ============================================================
 // ENVIRONMENT
 // ============================================================
@@ -998,7 +1007,7 @@ async function getYoutubeMetadata(
       [
         "--no-playlist",
 
-        "--cookies", "/etc/secrets/youtube-cookies.txt",
+        "--cookies", "/tmp/youtube-cookies.txt",
 
         "--print",
         "%(title)s\t%(channel)s",
@@ -1071,7 +1080,7 @@ async function processVideo(
     [
       "--no-playlist",
 
-      "--cookies", "/etc/secrets/youtube-cookies.txt",
+      "--cookies", "/tmp/youtube-cookies.txt",
 
       "-f",
       "bestaudio/best",
