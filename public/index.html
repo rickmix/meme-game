@@ -556,7 +556,7 @@
 
         <div
           id="multiAnswerStatus"
-          class="answer-status hidden"
+          class="answer-status answer hidden"
         ></div>
 
 
@@ -594,12 +594,11 @@
         Round complete
       </h2>
 
-      <p
+      <div
         id="roundAnswer"
-        class="muted"
+        class="answer-status answer"
       >
-        Answer
-      </p>
+    </div>
 
 
       <div
@@ -637,14 +636,21 @@
         class="scoreboard"
       ></div>
 
+      <div class="final-actions">
+        <button
+          id="finalNewGameBtn"
+          class="primary"
+        >
+          New Game
+        </button>
 
-      <button
-        id="finalLeaveBtn"
-        class="primary"
-        type="button"
-      >
-        Leave party
-      </button>
+        <button
+          id="finalLeaveBtn"
+          class="secondary"
+        >
+          Leave Game
+        </button>
+      </div>
 
     </section>
 

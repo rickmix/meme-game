@@ -3583,7 +3583,7 @@ function finishCurrentRound(
         );
       }
     },
-    2500
+    25000
   );
 }
 
@@ -4013,6 +4013,141 @@ io.on(
           player.currentRoundPoints =
             0;
         }
+
+        emitPartyUpdate(
+          party
+        );
+
+        await startNextRound(
+          party
+        );
+      }
+    );
+
+    // --------------------------------------------------------
+    // NEW GAME
+    // --------------------------------------------------------
+
+    socket.on(
+      "newGame",
+      async data => {
+        const code =
+          getPartyCode(data);
+
+        const party =
+          parties.get(code);
+
+        if (!party) {
+          return socket.emit(
+            "partyError",
+            {
+              message:
+                "Party not found."
+            }
+          );
+        }
+
+        if (
+          party.hostId !==
+          socket.id
+        ) {
+          return socket.emit(
+            "partyError",
+            {
+              message:
+                "Only the host can start a new game."
+            }
+          );
+        }
+
+        if (
+          party.started
+        ) {
+          return;
+        }
+
+        const ready =
+          getReadyVideos();
+
+        if (
+          ready.length < 1
+        ) {
+          return socket.emit(
+            "partyError",
+            {
+              message:
+                "There are no ready videos available."
+            }
+          );
+        }
+
+        // ------------------------------------------------------
+        // RESET GAME
+        // ------------------------------------------------------
+
+        party.started =
+          true;
+
+        party.finished =
+          false;
+
+        party.roundNumber =
+          1;
+
+        party.currentRound =
+          null;
+
+        party.roundFinished =
+          false;
+
+        party.roundStartedAt =
+          null;
+
+        party.roundEndsAt =
+          null;
+
+        party.usedVideoIds =
+          new Set();
+
+        if (
+          party.roundTimer
+        ) {
+          clearTimeout(
+            party.roundTimer
+          );
+
+          party.roundTimer =
+            null;
+        }
+
+        // Reset all player scores
+        // but keep the players in the party.
+        for (
+          const player of
+            party.players.values()
+        ) {
+          player.score =
+            0;
+
+          player.answered =
+            false;
+
+          player.currentRoundPoints =
+            0;
+        }
+
+        // Tell all players that the new game has started.
+        io.to(
+          party.code
+        ).emit(
+          "newGameStarted",
+          {
+            party:
+              serializeParty(
+                party
+              )
+          }
+        );
 
         emitPartyUpdate(
           party

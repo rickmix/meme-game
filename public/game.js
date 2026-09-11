@@ -106,6 +106,7 @@ const roundResults = $("#roundResults");
 const multiFinalResult = $("#multiFinalResult");
 const finalScoreboard = $("#finalScoreboard");
 const finalLeaveBtn = $("#finalLeaveBtn");
+const finalNewGameBtn = $("#finalNewGameBtn");
 
 // ============================================================
 // SINGLE PLAYER STATE
@@ -200,6 +201,13 @@ function setupTabs() {
   singleTab?.addEventListener(
     "click",
     () => {
+      // Already on Single Player — do nothing.
+      if (
+        singleTab?.classList.contains("active")
+      ) {
+        return;
+      }
+
       /*
        * If a multiplayer game is currently running,
        * ask before leaving it.
@@ -231,6 +239,13 @@ function setupTabs() {
   multiTab?.addEventListener(
     "click",
     () => {
+      // Already on Multiplayer — do nothing.
+      if (
+        multiTab?.classList.contains("active")
+      ) {
+        return;
+      }
+
       /*
        * If a single-player game is currently running,
        * ask before leaving it.
@@ -252,7 +267,6 @@ function setupTabs() {
     }
   );
 }
-
 // ============================================================
 // CHECK MULTIPLAYER GAME STATE
 // ============================================================
@@ -1729,6 +1743,11 @@ function setupMultiplayer() {
     leaveParty
   );
 
+  finalNewGameBtn?.addEventListener(
+    "click",
+    startNewMultiplayerGame
+  );
+
   multiPlayBtn?.addEventListener(
     "click",
     replayMultiClip
@@ -1838,6 +1857,30 @@ function startParty() {
     {
       code: multiState.partyCode,
       partyCode: multiState.partyCode
+    }
+  );
+}
+
+function startNewMultiplayerGame() {
+  if (
+    !multiState.inParty ||
+    !multiState.isHost
+  ) {
+    return;
+  }
+
+  if (finalNewGameBtn) {
+    finalNewGameBtn.disabled = true;
+  }
+
+  socket.emit(
+    "newGame",
+    {
+      code:
+        multiState.partyCode,
+
+      partyCode:
+        multiState.partyCode
     }
   );
 }
@@ -2162,6 +2205,33 @@ socket.on(
     }
   }
 );
+
+  socket.on(
+    "newGameStarted",
+    data => {
+      console.log(
+        "New multiplayer game started:",
+        data
+      );
+
+      const party =
+        data?.party ||
+        data;
+
+      if (party) {
+        applyParty(party);
+      }
+
+      multiState.finished = false;
+      multiState.started = true;
+      multiState.roundNumber = 0;
+      multiState.answered = false;
+
+      if (finalNewGameBtn) {
+        finalNewGameBtn.disabled = false;
+      }
+    }
+  );
 // ============================================================
 // SOCKET ERRORS
 // ============================================================
@@ -2359,13 +2429,18 @@ function renderPlayerList(players) {
     return;
   }
 
-  players.forEach(
+  const sorted = [...players].sort(
+    (a, b) =>
+      getPlayerScore(b) -
+      getPlayerScore(a)
+  );
+
+  sorted.forEach(
     (player) => {
       const row =
         document.createElement("div");
 
-      row.className =
-        "player-row";
+      row.className = "player-row";
 
       const name =
         document.createElement("span");
@@ -2389,9 +2464,7 @@ function renderPlayerList(players) {
         document.createElement("strong");
 
       score.textContent =
-        String(
-          getPlayerScore(player)
-        );
+        String(getPlayerScore(player));
 
       row.appendChild(name);
       row.appendChild(score);
@@ -2914,17 +2987,17 @@ function submitMultiAnswer(answerId) {
     videoId: answerId
   });
 
-  if (answerId === null) {
-    showMultiAnswerStatus(
-      "Time's up!",
-      false
-    );
-  } else {
-    showMultiAnswerStatus(
-      "Answer submitted!",
-      true
-    );
-  }
+  // if (answerId === null) {
+  //   showMultiAnswerStatus(
+  //     "Time's up!",
+  //     false
+  //   );
+  // } else {
+  //   showMultiAnswerStatus(
+  //     "Answer submitted!",
+  //     true
+  //   );
+  // }
 }
 
 function disableMultiChoices() {
@@ -2977,8 +3050,8 @@ function finishMultiplayerRound(data) {
   if (roundAnswer) {
     roundAnswer.textContent =
       typeof answer === "string"
-        ? answer
-        : getChoiceTitle(answer);
+        ? `Answer: ${answer}`
+        : `Answer: ${getChoiceTitle}`;
   }
 
   renderRoundResults(
@@ -3014,42 +3087,45 @@ function renderRoundResults(players) {
     return;
   }
 
-  players.forEach(
-    (player) => {
-      const row =
-        document.createElement(
-          "div"
-        );
-
-      row.className =
-        "round-result-row";
-
-      const name =
-        document.createElement(
-          "span"
-        );
-
-      name.textContent =
-        player.name ||
-        player.username ||
-        "Player";
-
-      const points =
-        document.createElement(
-          "strong"
-        );
-
-      points.textContent =
-        formatScoreChange(player);
-
-      row.appendChild(name);
-      row.appendChild(points);
-
-      roundResults.appendChild(row);
-    }
+  const sorted = [...players].sort(
+    (a, b) =>
+      getPlayerScore(b) -
+      getPlayerScore(a)
   );
-}
 
+  sorted.forEach((player) => {
+    const row =
+      document.createElement(
+        "div"
+      );
+
+    row.className =
+      "round-result-row";
+
+    const name =
+      document.createElement(
+        "span"
+      );
+
+    name.textContent =
+      player.name ||
+      player.username ||
+      "Player";
+
+    const points =
+      document.createElement(
+        "strong"
+      );
+
+    points.textContent =
+      formatScoreChange(player);
+
+    row.appendChild(name);
+    row.appendChild(points);
+
+    roundResults.appendChild(row);
+  });
+}
 // ============================================================
 // FINAL SCOREBOARD
 // ============================================================
@@ -3152,6 +3228,13 @@ function showMultiFinal() {
   multiGame?.classList.add("hidden");
   multiRoundResult?.classList.add("hidden");
   multiFinalResult?.classList.remove("hidden");
+
+  if (finalNewGameBtn) {
+    finalNewGameBtn.classList.toggle(
+      "hidden",
+      !multiState.isHost
+    );
+  }
 }
 
 // ============================================================

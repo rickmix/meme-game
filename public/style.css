@@ -553,7 +553,6 @@ form .primary {
   align-items: center;
   gap: 20px;
   padding-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .party-code {
@@ -767,6 +766,11 @@ form .primary {
   color: #ffaaa9;
 }
 
+.answer-status.answer {
+  background: #fff;
+  color: #101218;
+}
+
 /* ==========================================================
    SCOREBOARD
    ========================================================== */
@@ -843,6 +847,12 @@ form .primary {
   font-weight: 700;
   text-align: center;
   margin-bottom: 1rem;
+}
+
+.final-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 
 /* ==========================================================
