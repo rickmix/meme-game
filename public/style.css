@@ -678,6 +678,7 @@ form .primary {
 
   padding: 15px 17px;
 
+  -webkit-tap-highlight-color: transparent;
   background:
     linear-gradient(
       145deg,
@@ -698,17 +699,26 @@ form .primary {
     border-color 0.15s;
 }
 
-.choice-button:hover {
-  transform: translateY(-2px);
+.choice-button:focus {
+  outline: none;
+}
 
-  background:
-    linear-gradient(
-      145deg,
-      #282f40,
-      #202735
-    );
+.choice-button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 
-  border-color: rgba(255, 255, 255, 0.15);
+@media (hover: hover) and (pointer: fine) {
+  .choice-button:hover {
+    transform: translateY(-2px);
+    background:
+      linear-gradient(
+        145deg,
+        #282f40,
+        #202735
+      );
+    border-color: rgba(255, 255, 255, 0.15);
+  }
 }
 
 .choice-button.correct {

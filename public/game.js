@@ -3080,6 +3080,8 @@ function startMultiAnswerTimer() {
 // ============================================================
 
 function renderMultiChoices() {
+  document.activeElement?.blur();
+  
   if (!multiChoices) {
     return;
   }
@@ -3136,6 +3138,8 @@ function renderMultiChoices() {
           submitMultiAnswer(
             getChoiceId(choice)
           );
+
+          button.blur();
         }
       );
 
