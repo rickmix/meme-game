@@ -7,6 +7,7 @@ const path = require("path");
 const http = require("http");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
+const VAD = require("node-vad");
 
 const { Server } = require("socket.io");
 const { createClient } = require("@supabase/supabase-js");
@@ -901,59 +902,89 @@ async function getAudioUrl(
 }
 
 // ============================================================
-// YOUTUBE HELPERS
+// VIDEO URL HELPERS
 // ============================================================
 
-function videoIdFromUrl(
-  input
-) {
+function getVideoSource(input) {
   try {
-    const u =
-      new URL(
-        input.trim()
-      );
+    const u = new URL(input.trim());
+    const hostname = u.hostname.toLowerCase();
+
+    // ----------------------------------------------------------
+    // YOUTUBE
+    // ----------------------------------------------------------
 
     if (
-      u.hostname ===
-      "youtu.be"
+      hostname === "youtu.be" ||
+      hostname.includes("youtube.com")
     ) {
-      return u.pathname
-        .slice(1)
-        .split("/")[0];
+      let id = null;
+
+      if (hostname === "youtu.be") {
+        id = u.pathname
+          .slice(1)
+          .split("/")[0];
+      }
+
+      if (hostname.includes("youtube.com")) {
+        if (u.pathname === "/watch") {
+          id = u.searchParams.get("v");
+        }
+
+        if (u.pathname.startsWith("/shorts/")) {
+          id = u.pathname
+            .split("/")[2];
+        }
+
+        if (u.pathname.startsWith("/embed/")) {
+          id = u.pathname
+            .split("/")[2];
+        }
+      }
+
+      if (id) {
+        return {
+          platform: "youtube",
+          id,
+          url: `https://www.youtube.com/watch?v=${id}`
+        };
+      }
     }
 
+    // ----------------------------------------------------------
+    // TIKTOK
+    // ----------------------------------------------------------
+
     if (
-      u.hostname.includes(
-        "youtube.com"
-      )
+      hostname === "tiktok.com" ||
+      hostname.endsWith(".tiktok.com")
     ) {
-      if (
-        u.pathname ===
-        "/watch"
-      ) {
-        return u.searchParams.get(
-          "v"
+      const match =
+        u.pathname.match(
+          /\/video\/(\d+)/
         );
+
+      if (match) {
+        return {
+          platform: "tiktok",
+          id: `tt_${match[1]}`,
+          url: input.trim()
+        };
       }
 
-      if (
-        u.pathname.startsWith(
-          "/shorts/"
-        )
-      ) {
-        return u.pathname
-          .split("/")[2];
-      }
-
-      if (
-        u.pathname.startsWith(
-          "/embed/"
-        )
-      ) {
-        return u.pathname
-          .split("/")[2];
-      }
+      // TikTok short/share URLs don't necessarily contain
+      // the video ID. yt-dlp can resolve these directly.
+      return {
+        platform: "tiktok",
+        id: `tt_${crypto
+          .createHash("sha1")
+          .update(input.trim())
+          .digest("hex")
+          .slice(0, 16)}`,
+        url: input.trim()
+      };
     }
+
   } catch {}
 
   return null;
@@ -1008,6 +1039,7 @@ async function getDuration(
 // FIND GOOD SECTIONS
 // ============================================================
 
+
 async function findGoodSections(
   file,
   duration
@@ -1023,21 +1055,15 @@ async function findGoodSections(
       "ffmpeg",
       [
         "-hide_banner",
-
         "-i",
         file,
-
         "-vn",
-
         "-ac",
         "1",
-
         "-ar",
         "8000",
-
         "-f",
         "s16le",
-
         "-"
       ]
     );
@@ -1064,6 +1090,72 @@ async function findGoodSections(
     totalSamples /
     sampleRate;
 
+  // Never analyze or return more audio
+  // than actually exists.
+  const effectiveDuration =
+    Math.min(
+      duration,
+      actualDuration
+    );
+
+  // ============================================================
+  // VOICE ACTIVITY DETECTION
+  // ============================================================
+
+  const vad =
+    new VAD(
+      VAD.Mode.AGGRESSIVE
+    );
+
+  // WebRTC VAD supports 10, 20 or 30 ms frames.
+  // Use 30 ms at 8000 Hz = 240 samples = 480 bytes.
+  const vadFrameSamples =
+    240;
+
+  const vadFrameBytes =
+    vadFrameSamples *
+    bytesPerSample;
+
+  const speechFrames =
+    [];
+
+  for (
+    let offset = 0;
+    offset +
+      vadFrameBytes <=
+      buffer.length;
+    offset +=
+      vadFrameBytes
+  ) {
+    const frame =
+      buffer.subarray(
+        offset,
+        offset +
+          vadFrameBytes
+      );
+
+    try {
+      const result =
+        await vad.processAudio(
+          frame,
+          sampleRate
+        );
+
+      speechFrames.push(
+        result ===
+          VAD.Event.VOICE
+      );
+    } catch {
+      speechFrames.push(
+        false
+      );
+    }
+  }
+
+  // ============================================================
+  // AUDIO ANALYSIS
+  // ============================================================
+
   const sections = [];
 
   const windowDuration =
@@ -1078,16 +1170,19 @@ async function findGoodSections(
   for (
     let start = 0;
     start + windowDuration <=
-      Math.min(
-        actualDuration,
-        duration
-      );
+      effectiveDuration;
     start += step
   ) {
     let loudSubWindows =
       0;
 
     let totalSubWindows =
+      0;
+
+    let speechSubWindows =
+      0;
+
+    let totalSpeechFrames =
       0;
 
     let peak =
@@ -1098,6 +1193,10 @@ async function findGoodSections(
 
     let sampleCount =
       0;
+
+    // ==========================================================
+    // ANALYZE 0.5 SECOND SUB-WINDOWS
+    // ==========================================================
 
     for (
       let subStart = 0;
@@ -1119,7 +1218,6 @@ async function findGoodSections(
       const sampleEnd =
         Math.min(
           totalSamples,
-
           Math.floor(
             (
               absoluteStart +
@@ -1128,6 +1226,10 @@ async function findGoodSections(
               sampleRate
           )
         );
+
+      // --------------------------------------------------------
+      // Loudness
+      // --------------------------------------------------------
 
       let subSumSquares =
         0;
@@ -1221,6 +1323,60 @@ async function findGoodSections(
           peak,
           subPeak
         );
+
+      // --------------------------------------------------------
+      // Speech detection
+      // --------------------------------------------------------
+
+      const firstSpeechFrame =
+        Math.floor(
+          (
+            absoluteStart *
+            1000
+          ) /
+            30
+        );
+
+      const lastSpeechFrame =
+        Math.ceil(
+          (
+            (
+              absoluteStart +
+              subWindow
+            ) *
+            1000
+          ) /
+            30
+        );
+
+      let subSpeechFrames =
+        0;
+
+      for (
+        let frame =
+          firstSpeechFrame;
+        frame <
+          lastSpeechFrame;
+        frame++
+      ) {
+        if (
+          speechFrames[
+            frame
+          ]
+        ) {
+          subSpeechFrames++;
+        }
+      }
+
+      if (
+        subSpeechFrames >
+        0
+      ) {
+        speechSubWindows++;
+      }
+
+      totalSpeechFrames +=
+        subSpeechFrames;
     }
 
     if (
@@ -1229,8 +1385,26 @@ async function findGoodSections(
       continue;
     }
 
+    // ==========================================================
+    // CALCULATE SCORES
+    // ==========================================================
+
     const loudRatio =
       loudSubWindows /
+      totalSubWindows;
+
+    const speechRatio =
+      totalSpeechFrames /
+      Math.max(
+        1,
+        Math.round(
+          windowDuration /
+            0.03
+        )
+      );
+
+    const speechSubWindowRatio =
+      speechSubWindows /
       totalSubWindows;
 
     const rms =
@@ -1253,6 +1427,51 @@ async function findGoodSections(
 
     let score =
       0;
+
+    // ==========================================================
+    // SPEECH SCORE
+    // ==========================================================
+
+    // Human speech is strongly preferred.
+    if (
+      speechRatio >= 0.5
+    ) {
+      score += 6;
+    } else if (
+      speechRatio >= 0.3
+    ) {
+      score += 5;
+    } else if (
+      speechRatio >= 0.15
+    ) {
+      score += 3;
+    } else if (
+      speechRatio >= 0.05
+    ) {
+      score += 1;
+    }
+
+    // Reward speech spread throughout the section.
+    if (
+      speechSubWindowRatio >=
+      0.6
+    ) {
+      score += 3;
+    } else if (
+      speechSubWindowRatio >=
+      0.4
+    ) {
+      score += 2;
+    } else if (
+      speechSubWindowRatio >=
+      0.2
+    ) {
+      score += 1;
+    }
+
+    // ==========================================================
+    // EXISTING LOUDNESS SCORE
+    // ==========================================================
 
     if (
       loudRatio >= 0.8
@@ -1300,30 +1519,57 @@ async function findGoodSections(
 
     if (
       start <
-      duration - 15
+      effectiveDuration - 15
     ) {
       score += 1;
     }
 
-    if (
+    // ==========================================================
+    // ACCEPT SECTION
+    // ==========================================================
+
+    // Prefer sections containing speech.
+    //
+    // If VAD detects speech, accept it even if the audio
+    // isn't particularly loud.
+    //
+    // If VAD doesn't detect speech, keep the old loudness
+    // criteria as a fallback.
+    const hasSpeech =
+      speechRatio >= 0.05;
+
+    const isLoud =
       loudRatio >= 0.4 &&
-      db > -32
+      db > -32;
+
+    if (
+      hasSpeech ||
+      isLoud
     ) {
       sections.push({
         start:
           Number(
-            start.toFixed(
-              2
-            )
+            start.toFixed(2)
           ),
 
         duration:
           windowDuration,
 
-        score
+        score,
+
+        speechRatio:
+          Number(
+            speechRatio.toFixed(
+              2
+            )
+          )
       });
     }
   }
+
+  // ============================================================
+  // SORT BEST SECTIONS
+  // ============================================================
 
   sections.sort(
     (a, b) =>
@@ -1365,14 +1611,37 @@ async function findGoodSections(
     }
   }
 
+  // ============================================================
+  // FALLBACK
+  // ============================================================
+
   if (
     goodSections.length ===
     0
   ) {
+    // Short video: return one section containing
+    // the entire available audio.
+    if (
+      effectiveDuration <=
+      windowDuration
+    ) {
+      return [
+        {
+          start: 0,
+
+          duration:
+            effectiveDuration,
+
+          score: 0
+        }
+      ];
+    }
+
     const maxStart =
       Math.max(
         0,
-        duration - 10
+        effectiveDuration -
+          windowDuration
       );
 
     const fallback =
@@ -1390,20 +1659,17 @@ async function findGoodSections(
       fallback.push({
         start:
           Number(
-            start.toFixed(
-              2
-            )
+            start.toFixed(2)
           ),
 
         duration:
           Math.min(
-            10,
-            duration -
+            windowDuration,
+            effectiveDuration -
               start
           ),
 
-        score:
-          0
+        score: 0
       });
     }
 
@@ -1450,26 +1716,25 @@ function pickRandomSection(
 // YOUTUBE METADATA
 // ============================================================
 
-async function getYoutubeMetadata(
-  id
+async function getVideoMetadata(
+  source
 ) {
   try {
     const {
       stdout
-    } =
-      await command(
-        "yt-dlp",
-        youtubeArgs([
-          "--no-playlist",
+    } = await command(
+      "yt-dlp",
+      youtubeArgs([
+        "--no-playlist",
 
-          "--print",
-          "%(title)s\t%(channel)s",
+        "--print",
+        "%(title)s\t%(channel)s",
 
-          "--skip-download",
+        "--skip-download",
 
-          `https://www.youtube.com/watch?v=${id}`
-        ])
-      );
+        source.url
+      ])
+    );
 
     const [
       title,
@@ -1483,11 +1748,12 @@ async function getYoutubeMetadata(
       title,
       channel
     };
+
   } catch (
     error
   ) {
     console.error(
-      `Could not get metadata for ${id}:`,
+      `Could not get metadata for ${source.url}:`,
       error.message
     );
 
@@ -1517,8 +1783,15 @@ async function getYoutubeMetadata(
 //
 
 async function processVideo(
-  id
+  source
 ) {
+
+  const {
+    id,
+    platform,
+    url
+  } = source;
+
   const outputTemplate =
     path.join(
       VIDEOS,
@@ -1564,7 +1837,7 @@ async function processVideo(
       "-o",
       outputTemplate,
 
-      `https://www.youtube.com/watch?v=${id}`
+      url
     ])
   );
 
@@ -1662,8 +1935,8 @@ async function processVideo(
   // ----------------------------------------------------------
 
   const meta =
-    await getYoutubeMetadata(
-      id
+    await getVideoMetadata(
+      source
     );
 
   // ----------------------------------------------------------
@@ -1680,7 +1953,7 @@ async function processVideo(
   return {
     title:
       meta.title ||
-      `YouTube video ${id}`,
+      `${platform === "tiktok" ? "TikTok" : "YouTube"} video ${id}`,
 
     channel:
       meta.channel || "",
@@ -1990,20 +2263,25 @@ app.post(
     req,
     res
   ) => {
-    const id =
-      videoIdFromUrl(
-        req.body?.url ||
-          ""
-      );
+    const source =
+        getVideoSource(
+          req.body?.url ||
+            ""
+        );
 
-    if (!id) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Invalid YouTube URL."
-        });
-    }
+      if (!source) {
+        return res
+          .status(400)
+          .json({
+            error:
+              "Invalid YouTube or TikTok URL."
+          });
+      }
+
+      const {
+        id,
+        platform
+      } = source;
 
     // ========================================================
     // DUPLICATE CHECK
@@ -2073,7 +2351,7 @@ app.post(
 
       result =
         await processVideo(
-          id
+          source
         );
 
       // ======================================================

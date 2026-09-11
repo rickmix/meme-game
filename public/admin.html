@@ -63,7 +63,7 @@
   <section class="card">
 
     <h2>
-      Add a YouTube video
+      Add a video
     </h2>
 
     <p class="muted">
@@ -78,8 +78,7 @@
         id="url"
         required
         rows="4"
-        placeholder="Paste YouTube URLs separated by commas&#10;&#10;https://www.youtube.com/watch?v=abc123, https://youtu.be/xyz456"
-      ></textarea>
+        placeholder="Paste YouTube or TikTok URLs separated by commas&#10;&#10;https://www.youtube.com/watch?v=abc123, https://www.tiktok.com/@user/video/123456789"      ></textarea>
 
       <button
         class="primary"
@@ -349,7 +348,7 @@ $("#addForm").onsubmit =
     ) {
 
       $("#message").textContent =
-        "Please enter at least one YouTube URL.";
+        "Please enter at least one YouTube or TikTok URL.";
 
       return;
     }
