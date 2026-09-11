@@ -838,6 +838,13 @@ form .primary {
   margin-bottom: 25px;
 }
 
+.winner-message {
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
 /* ==========================================================
    ADMIN / VIDEO LIBRARY
    ========================================================== */

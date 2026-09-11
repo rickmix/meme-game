@@ -1090,42 +1090,49 @@ async function findGoodSections(
     totalSamples /
     sampleRate;
 
-  // Never analyze or return more audio
-  // than actually exists.
   const effectiveDuration =
     Math.min(
       duration,
       actualDuration
     );
 
-  // ============================================================
-  // VOICE ACTIVITY DETECTION
-  // ============================================================
+  const windowDuration =
+    10;
 
-  const vad =
-    new VAD(
-      VAD.Mode.AGGRESSIVE
-    );
+  // WebRTC VAD works with 30 ms frames.
+  const vadFrameDuration =
+    0.03;
 
-  // WebRTC VAD supports 10, 20 or 30 ms frames.
-  // Use 30 ms at 8000 Hz = 240 samples = 480 bytes.
   const vadFrameSamples =
-    240;
+    Math.round(
+      sampleRate *
+        vadFrameDuration
+    );
 
   const vadFrameBytes =
     vadFrameSamples *
     bytesPerSample;
+
+  const VAD =
+    require("node-vad");
+
+  const vad =
+    new VAD(
+      VAD.Mode.VERY_AGGRESSIVE
+    );
+
+  // ------------------------------------------------------------
+  // RUN VAD OVER ENTIRE AUDIO
+  // ------------------------------------------------------------
 
   const speechFrames =
     [];
 
   for (
     let offset = 0;
-    offset +
-      vadFrameBytes <=
+    offset + vadFrameBytes <=
       buffer.length;
-    offset +=
-      vadFrameBytes
+    offset += vadFrameBytes
   ) {
     const frame =
       buffer.subarray(
@@ -1134,55 +1141,84 @@ async function findGoodSections(
           vadFrameBytes
       );
 
-    try {
-      const result =
-        await vad.processAudio(
-          frame,
-          sampleRate
-        );
+    const result =
+      await vad.processAudio(
+        frame,
+        sampleRate
+      );
 
-      speechFrames.push(
-        result ===
-          VAD.Event.VOICE
-      );
-    } catch {
-      speechFrames.push(
-        false
-      );
-    }
+    speechFrames.push(
+      result ===
+        VAD.Event.VOICE
+    );
   }
 
-  // ============================================================
-  // AUDIO ANALYSIS
-  // ============================================================
+  // ------------------------------------------------------------
+  // SHORT VIDEO
+  // ------------------------------------------------------------
 
-  const sections = [];
+  if (
+    effectiveDuration <=
+    windowDuration
+  ) {
+    const speechRatio =
+      speechFrames.filter(
+        Boolean
+      ).length /
+      Math.max(
+        speechFrames.length,
+        1
+      );
 
-  const windowDuration =
-    10;
+    return [
+      {
+        start: 0,
 
+        duration:
+          effectiveDuration,
+
+        score: 0,
+
+        speechRatio:
+          Number(
+            speechRatio.toFixed(
+              2
+            )
+          )
+      }
+    ];
+  }
+
+  const sections =
+    [];
+
+  // Candidate every 1 second.
   const step =
-    2;
+    1;
 
   const subWindow =
     0.5;
 
+  // Only look up to 3 seconds into a candidate
+  // for the first speech.
+  const maxInitialSilence =
+    3;
+
+  // ------------------------------------------------------------
+  // ANALYZE CANDIDATE WINDOWS
+  // ------------------------------------------------------------
+
   for (
-    let start = 0;
-    start + windowDuration <=
+    let originalStart = 0;
+    originalStart +
+      windowDuration <=
       effectiveDuration;
-    start += step
+    originalStart += step
   ) {
     let loudSubWindows =
       0;
 
     let totalSubWindows =
-      0;
-
-    let speechSubWindows =
-      0;
-
-    let totalSpeechFrames =
       0;
 
     let peak =
@@ -1194,19 +1230,147 @@ async function findGoodSections(
     let sampleCount =
       0;
 
-    // ==========================================================
-    // ANALYZE 0.5 SECOND SUB-WINDOWS
-    // ==========================================================
+    let speechSubWindows =
+      0;
+
+    // ----------------------------------------------------------
+    // VAD FRAMES FOR ORIGINAL 10 SECOND WINDOW
+    // ----------------------------------------------------------
+
+    const firstSpeechFrame =
+      Math.floor(
+        (
+          originalStart *
+          sampleRate
+        ) /
+          vadFrameSamples
+      );
+
+    const lastSpeechFrame =
+      Math.min(
+        speechFrames.length,
+        Math.ceil(
+          (
+            (
+              originalStart +
+              windowDuration
+            ) *
+            sampleRate
+          ) /
+            vadFrameSamples
+        )
+      );
+
+    const sectionFrameCount =
+      Math.max(
+        0,
+        lastSpeechFrame -
+          firstSpeechFrame
+      );
+
+    let speechFrameCount =
+      0;
+
+    for (
+      let frame =
+        firstSpeechFrame;
+      frame <
+        lastSpeechFrame;
+      frame++
+    ) {
+      if (
+        speechFrames[frame]
+      ) {
+        speechFrameCount++;
+      }
+    }
+
+    const speechRatio =
+      speechFrameCount /
+      Math.max(
+        sectionFrameCount,
+        1
+      );
+
+    // ----------------------------------------------------------
+    // FIND FIRST SPEECH
+    // ----------------------------------------------------------
+
+    let firstSpeechTime =
+      null;
+
+    const maxSpeechSearchFrame =
+      Math.min(
+        lastSpeechFrame,
+        firstSpeechFrame +
+          Math.ceil(
+            maxInitialSilence /
+              vadFrameDuration
+          )
+      );
+
+    for (
+      let frame =
+        firstSpeechFrame;
+      frame <
+        maxSpeechSearchFrame;
+      frame++
+    ) {
+      if (
+        speechFrames[frame]
+      ) {
+        firstSpeechTime =
+          frame *
+          vadFrameDuration;
+
+        break;
+      }
+    }
+
+    // ----------------------------------------------------------
+    // MOVE START DIRECTLY TO FIRST SPEECH
+    // ----------------------------------------------------------
+
+    let start =
+      originalStart;
+
+    if (
+      firstSpeechTime !==
+      null
+    ) {
+      start =
+        Number(
+          firstSpeechTime.toFixed(
+            2
+          )
+        );
+    }
+
+    // ----------------------------------------------------------
+    // MAKE SURE 10 SECONDS REMAIN
+    // ----------------------------------------------------------
+
+    if (
+      start +
+        windowDuration >
+      effectiveDuration
+    ) {
+      continue;
+    }
+
+    // ----------------------------------------------------------
+    // 0.5 SECOND SUB-WINDOW ANALYSIS
+    // ----------------------------------------------------------
 
     for (
       let subStart = 0;
       subStart <
-      windowDuration;
+        windowDuration;
       subStart +=
         subWindow
     ) {
       const absoluteStart =
-        start +
+        originalStart +
         subStart;
 
       const sampleStart =
@@ -1227,10 +1391,6 @@ async function findGoodSections(
           )
         );
 
-      // --------------------------------------------------------
-      // Loudness
-      // --------------------------------------------------------
-
       let subSumSquares =
         0;
 
@@ -1240,11 +1400,15 @@ async function findGoodSections(
       let subPeak =
         0;
 
+      // --------------------------------------------------------
+      // LOUDNESS
+      // --------------------------------------------------------
+
       for (
         let i =
           sampleStart;
         i <
-        sampleEnd;
+          sampleEnd;
         i++
       ) {
         const offset =
@@ -1325,86 +1489,71 @@ async function findGoodSections(
         );
 
       // --------------------------------------------------------
-      // Speech detection
+      // SPEECH IN SUB-WINDOW
       // --------------------------------------------------------
 
-      const firstSpeechFrame =
+      const firstFrame =
         Math.floor(
           (
             absoluteStart *
-            1000
+            sampleRate
           ) /
-            30
+            vadFrameSamples
         );
 
-      const lastSpeechFrame =
-        Math.ceil(
-          (
+      const lastFrame =
+        Math.min(
+          speechFrames.length,
+          Math.ceil(
             (
-              absoluteStart +
-              subWindow
-            ) *
-            1000
-          ) /
-            30
+              (
+                absoluteStart +
+                subWindow
+              ) *
+              sampleRate
+            ) /
+              vadFrameSamples
+          )
         );
 
-      let subSpeechFrames =
-        0;
+      let hasSpeech =
+        false;
 
       for (
         let frame =
-          firstSpeechFrame;
+          firstFrame;
         frame <
-          lastSpeechFrame;
+          lastFrame;
         frame++
       ) {
         if (
-          speechFrames[
-            frame
-          ]
+          speechFrames[frame]
         ) {
-          subSpeechFrames++;
+          hasSpeech = true;
+          break;
         }
       }
 
       if (
-        subSpeechFrames >
-        0
+        hasSpeech
       ) {
         speechSubWindows++;
       }
-
-      totalSpeechFrames +=
-        subSpeechFrames;
     }
 
     if (
-      totalSubWindows === 0
+      totalSubWindows ===
+      0
     ) {
       continue;
     }
 
-    // ==========================================================
-    // CALCULATE SCORES
-    // ==========================================================
+    // ----------------------------------------------------------
+    // LOUDNESS
+    // ----------------------------------------------------------
 
     const loudRatio =
       loudSubWindows /
-      totalSubWindows;
-
-    const speechRatio =
-      totalSpeechFrames /
-      Math.max(
-        1,
-        Math.round(
-          windowDuration /
-            0.03
-        )
-      );
-
-    const speechSubWindowRatio =
-      speechSubWindows /
       totalSubWindows;
 
     const rms =
@@ -1425,34 +1574,51 @@ async function findGoodSections(
         )
       );
 
+    // ----------------------------------------------------------
+    // SPEECH DISTRIBUTION
+    // ----------------------------------------------------------
+
+    const speechSubWindowRatio =
+      speechSubWindows /
+      totalSubWindows;
+
+    // ----------------------------------------------------------
+    // SCORE
+    // ----------------------------------------------------------
+
     let score =
       0;
 
-    // ==========================================================
-    // SPEECH SCORE
-    // ==========================================================
-
-    // Human speech is strongly preferred.
+    // Speech ratio
     if (
-      speechRatio >= 0.5
+      speechRatio >=
+      0.8
+    ) {
+      score += 8;
+    } else if (
+      speechRatio >=
+      0.6
     ) {
       score += 6;
     } else if (
-      speechRatio >= 0.3
+      speechRatio >=
+      0.4
     ) {
-      score += 5;
+      score += 4;
     } else if (
-      speechRatio >= 0.15
+      speechRatio >=
+      0.2
     ) {
-      score += 3;
-    } else if (
-      speechRatio >= 0.05
-    ) {
-      score += 1;
+      score += 2;
     }
 
-    // Reward speech spread throughout the section.
+    // Speech spread
     if (
+      speechSubWindowRatio >=
+      0.8
+    ) {
+      score += 4;
+    } else if (
       speechSubWindowRatio >=
       0.6
     ) {
@@ -1469,24 +1635,25 @@ async function findGoodSections(
       score += 1;
     }
 
-    // ==========================================================
-    // EXISTING LOUDNESS SCORE
-    // ==========================================================
-
+    // Existing loudness scoring
     if (
-      loudRatio >= 0.8
+      loudRatio >=
+      0.8
     ) {
       score += 4;
     } else if (
-      loudRatio >= 0.6
+      loudRatio >=
+      0.6
     ) {
       score += 3;
     } else if (
-      loudRatio >= 0.4
+      loudRatio >=
+      0.4
     ) {
       score += 2;
     } else if (
-      loudRatio >= 0.25
+      loudRatio >=
+      0.25
     ) {
       score += 1;
     }
@@ -1524,33 +1691,20 @@ async function findGoodSections(
       score += 1;
     }
 
-    // ==========================================================
+    // ----------------------------------------------------------
     // ACCEPT SECTION
-    // ==========================================================
-
-    // Prefer sections containing speech.
-    //
-    // If VAD detects speech, accept it even if the audio
-    // isn't particularly loud.
-    //
-    // If VAD doesn't detect speech, keep the old loudness
-    // criteria as a fallback.
-    const hasSpeech =
-      speechRatio >= 0.05;
-
-    const isLoud =
-      loudRatio >= 0.4 &&
-      db > -32;
+    // ----------------------------------------------------------
 
     if (
-      hasSpeech ||
-      isLoud
+      speechRatio >= 0.2 ||
+      (
+        loudRatio >= 0.4 &&
+        db > -32
+      )
     ) {
       sections.push({
         start:
-          Number(
-            start.toFixed(2)
-          ),
+          start,
 
         duration:
           windowDuration,
@@ -1567,9 +1721,9 @@ async function findGoodSections(
     }
   }
 
-  // ============================================================
-  // SORT BEST SECTIONS
-  // ============================================================
+  // ------------------------------------------------------------
+  // SORT BY SCORE
+  // ------------------------------------------------------------
 
   sections.sort(
     (a, b) =>
@@ -1577,54 +1731,40 @@ async function findGoodSections(
       a.score
   );
 
+  // No spacing restriction.
   const goodSections =
-    [];
-
-  for (
-    const section of
-      sections
-  ) {
-    const tooClose =
-      goodSections.some(
-        existing =>
-          Math.abs(
-            existing.start -
-              section.start
-          ) < 10
-      );
-
-    if (
-      tooClose
-    ) {
-      continue;
-    }
-
-    goodSections.push(
-      section
+    sections.slice(
+      0,
+      20
     );
 
-    if (
-      goodSections.length >=
-      20
-    ) {
-      break;
-    }
-  }
-
-  // ============================================================
+  // ------------------------------------------------------------
   // FALLBACK
-  // ============================================================
+  // ------------------------------------------------------------
 
   if (
     goodSections.length ===
     0
   ) {
-    // Short video: return one section containing
-    // the entire available audio.
+    const maxStart =
+      Math.max(
+        0,
+        effectiveDuration -
+          windowDuration
+      );
+
     if (
-      effectiveDuration <=
-      windowDuration
+      maxStart === 0
     ) {
+      const speechRatio =
+        speechFrames.filter(
+          Boolean
+        ).length /
+        Math.max(
+          speechFrames.length,
+          1
+        );
+
       return [
         {
           start: 0,
@@ -1632,17 +1772,17 @@ async function findGoodSections(
           duration:
             effectiveDuration,
 
-          score: 0
+          score: 0,
+
+          speechRatio:
+            Number(
+              speechRatio.toFixed(
+                2
+              )
+            )
         }
       ];
     }
-
-    const maxStart =
-      Math.max(
-        0,
-        effectiveDuration -
-          windowDuration
-      );
 
     const fallback =
       [];
@@ -1669,7 +1809,9 @@ async function findGoodSections(
               start
           ),
 
-        score: 0
+        score: 0,
+
+        speechRatio: 0
       });
     }
 
@@ -2871,6 +3013,13 @@ app.get(
               0.5
           );
 
+      // Pick one of the analyzed,
+      // speech-friendly sections.
+      const section =
+        pickRandomSection(
+          answer.goodSections
+        );
+
       const audioUrl =
         await getAudioUrl(
           answer.id
@@ -2885,8 +3034,20 @@ app.get(
 
         audioUrl,
 
+        // IMPORTANT:
+        // Start playback at the speech-aligned
+        // start returned by findGoodSections().
+        startTime:
+          section?.start || 0,
+
+        // This is the maximum reveal duration.
+        // Normally this will be 10 seconds.
         duration:
-          answer.duration,
+          section?.duration ||
+          Math.min(
+            answer.duration,
+            10
+          ),
 
         choices
       });
@@ -2923,7 +3084,7 @@ const ROUND_OPTIONS = [
 ];
 
 const ROUND_DURATION =
-  20 * 1000;
+  15 * 1000;
 
 // ============================================================
 // PARTY HELPERS
@@ -3085,13 +3246,34 @@ async function createMultiplayerRound(
     );
   }
 
-  const answer =
-    ready[
-      Math.floor(
-        Math.random() *
-          ready.length
-      )
-    ];
+  let availableVideos =
+    ready.filter(
+      video =>
+        !party.usedVideoIds.has(
+          video.id
+        )
+    );
+
+    // If every video has already been used,
+    // start allowing videos again.
+    if (
+      availableVideos.length === 0
+    ) {
+      party.usedVideoIds.clear();
+      availableVideos = ready;
+    }
+
+    const answer =
+      availableVideos[
+        Math.floor(
+          Math.random() *
+            availableVideos.length
+        )
+      ];
+
+    party.usedVideoIds.add(
+      answer.id
+    );
 
   const otherChoices =
     ready
@@ -3539,7 +3721,9 @@ io.on(
               null,
 
             roundFinished:
-              false
+              false,
+
+            usedVideoIds: new Set(),
           };
 
           party.players.set(

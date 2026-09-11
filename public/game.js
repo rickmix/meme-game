@@ -2116,17 +2116,52 @@ socket.on(
     clearMultiTimers();
     stopMultiAudio();
 
+    const players =
+      data?.players ||
+      data?.scoreboard ||
+      data?.results ||
+      [];
+
     showMultiFinal();
 
     renderFinalScoreboard(
-      data?.players ||
-        data?.scoreboard ||
-        data?.results ||
-        []
+      players
     );
+
+    const winner =
+      players[0];
+
+    const winnerId =
+      winner?.id ??
+      winner?.socketId ??
+      winner?.playerId;
+
+    multiFinalResult
+      ?.querySelector(".winner-message")
+      ?.remove();
+
+    if (
+      winnerId !== undefined &&
+      String(winnerId) ===
+        String(socket.id)
+    ) {
+      showWinConfetti();
+
+      const winnerText =
+        document.createElement("div");
+
+      winnerText.className =
+        "winner-message";
+
+      winnerText.textContent =
+        "You win! 🎉";
+
+      multiFinalResult?.prepend(
+        winnerText
+      );
+    }
   }
 );
-
 // ============================================================
 // SOCKET ERRORS
 // ============================================================
@@ -2505,7 +2540,7 @@ function startMultiplayerRound(round) {
   multiState.duration =
     Number(
       round.duration
-    ) || 20;
+    ) || 15;
 
   multiState.audioDuration =
     Number(
@@ -3162,7 +3197,7 @@ function resetMultiState() {
   multiState.roundNumber = 0;
   multiState.totalRounds = 10;
 
-  multiState.duration = 20;
+  multiState.duration = 15;
 
   multiState.audioDuration = 0;
   multiState.startTime = 0;
@@ -3367,4 +3402,38 @@ function formatScoreChange(player) {
   return String(
     player.score || 0
   );
+}
+
+function showWinConfetti() {
+  if (typeof confetti !== "function") {
+    return;
+  }
+
+  confetti({
+    particleCount: 180,
+    spread: 100,
+    origin: {
+      y: 0.6
+    }
+  });
+
+  setTimeout(() => {
+    confetti({
+      particleCount: 180,
+      spread: 100,
+      origin: {
+        y: 0.6
+      }
+    });
+  }, 700);
+
+  setTimeout(() => {
+    confetti({
+      particleCount: 180,
+      spread: 100,
+      origin: {
+        y: 0.6
+      }
+    });
+  }, 1400);
 }
