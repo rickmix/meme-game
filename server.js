@@ -3172,34 +3172,18 @@ function serializePlayer(
   };
 }
 
-function serializeParty(
-  party
-) {
+function serializeParty(party) {
   return {
-    code:
-      party.code,
+    code: party.code,
+    hostId: party.hostId,
+    rounds: party.totalRounds,
+    totalRounds: party.totalRounds,
+    started: party.started,
+    finished: party.finished,
 
-    hostId:
-      party.hostId,
-
-    rounds:
-      party.totalRounds,
-
-    totalRounds:
-      party.totalRounds,
-
-    started:
-      party.started,
-
-    finished:
-      party.finished,
-
-    players:
-      Array.from(
-        party.players.values()
-      ).map(
-        serializePlayer
-      )
+    players: Array.from(
+      party.players.values()
+    ).map(serializePlayer)
   };
 }
 
@@ -3566,7 +3550,7 @@ function finishCurrentRound(
           party
         );
       },
-      2500
+      1000
     );
 
     return;
@@ -3583,7 +3567,7 @@ function finishCurrentRound(
         );
       }
     },
-    25000
+    2500
   );
 }
 
@@ -4283,14 +4267,12 @@ io.on(
           "answerAccepted",
           {
             correct,
-
             points,
-
-            score:
-              player.score,
-
-            totalScore:
-              player.score
+            score: player.score,
+            totalScore: player.score,
+            answerId,
+            correctAnswerId:
+              party.currentRound.answerId
           }
         );
 

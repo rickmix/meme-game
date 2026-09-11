@@ -129,7 +129,6 @@ const singleState = {
   playing: false,
   answered: false,
 
-  // TRUE only while an actual single-player game is running.
   gameActive: false,
 
   clipTimer: null,
@@ -162,6 +161,8 @@ const multiState = {
 
   choices: [],
   answered: false,
+  selectedAnswerId: null,
+  timeUp: false,
 
   clipTimer: null,
   countdownTimer: null,
@@ -194,24 +195,15 @@ function initialize() {
 // ============================================================
 
 function setupTabs() {
-  // ----------------------------------------------------------
-  // SINGLE PLAYER TAB
-  // ----------------------------------------------------------
-
   singleTab?.addEventListener(
     "click",
     () => {
-      // Already on Single Player — do nothing.
       if (
         singleTab?.classList.contains("active")
       ) {
         return;
       }
 
-      /*
-       * If a multiplayer game is currently running,
-       * ask before leaving it.
-       */
       if (
         multiState.started ||
         multiplayerGameActive()
@@ -232,24 +224,15 @@ function setupTabs() {
     }
   );
 
-  // ----------------------------------------------------------
-  // MULTIPLAYER TAB
-  // ----------------------------------------------------------
-
   multiTab?.addEventListener(
     "click",
     () => {
-      // Already on Multiplayer — do nothing.
       if (
         multiTab?.classList.contains("active")
       ) {
         return;
       }
 
-      /*
-       * If a single-player game is currently running,
-       * ask before leaving it.
-       */
       if (singleState.gameActive) {
         const confirmed = confirm(
           "Are you sure you want to switch to Multiplayer?\n\n" +
@@ -267,6 +250,7 @@ function setupTabs() {
     }
   );
 }
+
 // ============================================================
 // CHECK MULTIPLAYER GAME STATE
 // ============================================================
@@ -379,9 +363,6 @@ function endSinglePlayerGame() {
 // ============================================================
 
 function endMultiplayerGame(sendLeave = true) {
-  /*
-   * Tell the server we are leaving the party/game.
-   */
   if (
     sendLeave &&
     multiState.inParty &&
@@ -489,11 +470,6 @@ function setupSinglePlayer() {
 // ============================================================
 
 async function startSingleGame() {
-  /*
-   * The game becomes active immediately.
-   * This makes the Multiplayer tab ask for
-   * confirmation if clicked while playing.
-   */
   singleState.gameActive = true;
 
   clearSingleTimers();
@@ -515,10 +491,6 @@ async function startSingleGame() {
 // ============================================================
 
 async function loadSingleRound() {
-  /*
-   * If the user switched mode while the
-   * request was loading, don't continue.
-   */
   if (!singleState.gameActive) {
     return;
   }
@@ -1218,26 +1190,12 @@ function revealMoreSingle() {
   const actualDuration =
     singleState.audioDuration;
 
-  /*
-   * Find the next timing from the master list.
-   *
-   * Example:
-   *
-   * 0.3 -> 0.5
-   * 0.5 -> 1
-   * 1   -> 5
-   * 5   -> 10
-   */
   const nextDuration =
     SINGLE_REVEAL_TIMINGS.find(
       (value) =>
         value > currentDuration
     );
 
-  /*
-   * There is no next timing,
-   * or the whole clip is already revealed.
-   */
   if (
     !nextDuration ||
     currentDuration >= actualDuration
@@ -1246,10 +1204,6 @@ function revealMoreSingle() {
     return;
   }
 
-  /*
-   * Never reveal more than the actual
-   * duration of the audio clip.
-   */
   singleState.revealDuration =
     Math.min(
       nextDuration,
@@ -1968,7 +1922,6 @@ socket.on(
 
     applyParty(party);
 
-    // Always update the scoreboard.
     renderMultiScoreboard(
       multiState.players
     );
@@ -2028,10 +1981,6 @@ socket.on(
       round
     );
 
-    /*
-     * This is the actual point at which
-     * multiplayer becomes an active game.
-     */
     multiState.started = true;
     multiState.finished = false;
 
@@ -2051,7 +2000,6 @@ socket.on(
       data
     );
 
-    // Update the current player's score
     if (
       data?.score !== undefined
     ) {
@@ -2070,8 +2018,6 @@ socket.on(
       }
     }
 
-    // If the server sends the full player list,
-    // update the live scoreboard and lobby player list.
     const players =
       data?.players ||
       data?.scoreboard ||
@@ -2089,19 +2035,12 @@ socket.on(
       );
     }
 
-    // Show whether the answer was correct
     if (
       data?.correct !== undefined
     ) {
-      showMultiAnswerStatus(
-        data.correct
-          ? "Correct!"
-          : "Wrong!",
-        Boolean(data.correct)
-      );
+      showMultiAnswerResult(data);
     }
 
-    // Fallback if the server only sends points
     if (
       data?.points !== undefined &&
       data?.score === undefined &&
@@ -2206,32 +2145,38 @@ socket.on(
   }
 );
 
-  socket.on(
-    "newGameStarted",
-    data => {
-      console.log(
-        "New multiplayer game started:",
-        data
-      );
+// ============================================================
+// NEW GAME STARTED
+// ============================================================
 
-      const party =
-        data?.party ||
-        data;
+socket.on(
+  "newGameStarted",
+  (data) => {
+    console.log(
+      "New multiplayer game started:",
+      data
+    );
 
-      if (party) {
-        applyParty(party);
-      }
+    const party =
+      data?.party ||
+      data;
 
-      multiState.finished = false;
-      multiState.started = true;
-      multiState.roundNumber = 0;
-      multiState.answered = false;
-
-      if (finalNewGameBtn) {
-        finalNewGameBtn.disabled = false;
-      }
+    if (party) {
+      applyParty(party);
     }
-  );
+
+    multiState.finished = false;
+    multiState.started = true;
+    multiState.roundNumber = 0;
+    multiState.answered = false;
+    multiState.timeUp = false;
+
+    if (finalNewGameBtn) {
+      finalNewGameBtn.disabled = false;
+    }
+  }
+);
+
 // ============================================================
 // SOCKET ERRORS
 // ============================================================
@@ -2254,6 +2199,10 @@ socket.on(
 
     if (startPartyBtn) {
       startPartyBtn.disabled = false;
+    }
+
+    if (finalNewGameBtn) {
+      finalNewGameBtn.disabled = false;
     }
 
     showMultiSetupError(
@@ -2283,6 +2232,10 @@ socket.on(
 
     if (startPartyBtn) {
       startPartyBtn.disabled = false;
+    }
+
+    if (finalNewGameBtn) {
+      finalNewGameBtn.disabled = false;
     }
 
     showMultiSetupError(
@@ -2322,7 +2275,7 @@ function applyParty(party) {
     Boolean(party.started);
 
   multiState.finished =
-    Boolean(party.gameFinished);
+    Boolean(party.finished);
 
   multiState.totalRounds =
     Number(
@@ -2331,8 +2284,6 @@ function applyParty(party) {
         multiState.totalRounds
     );
 
-  // Only replace the player list when the server
-  // actually included one.
   const players =
     party.players ??
     party.playerList ??
@@ -2464,7 +2415,9 @@ function renderPlayerList(players) {
         document.createElement("strong");
 
       score.textContent =
-        String(getPlayerScore(player));
+        String(
+          getPlayerScore(player)
+        );
 
       row.appendChild(name);
       row.appendChild(score);
@@ -2492,101 +2445,249 @@ function getPlayerScore(player) {
   ) || 0;
 }
 
+// ============================================================
+// MULTIPLAYER SCOREBOARD
+// ============================================================
+
 function renderMultiScoreboard(players) {
   if (!multiScoreboard) {
     return;
   }
 
-  multiScoreboard.innerHTML = "";
-
   if (!Array.isArray(players)) {
     return;
   }
 
-  const sorted =
-    [...players].sort(
-      (a, b) =>
-        getPlayerScore(b) -
-        getPlayerScore(a)
+  const currentPlayerIds =
+    new Set(
+      players.map(
+        (player) =>
+          String(
+            player.id ??
+            player.socketId ??
+            player.playerId
+          )
+      )
     );
+
+  // Remove players that are no longer in the party
+  multiScoreboard
+    .querySelectorAll(".score-row")
+    .forEach((row) => {
+      const id =
+        row.dataset.playerId;
+
+      if (
+        id &&
+        !currentPlayerIds.has(id)
+      ) {
+        row.remove();
+      }
+    });
+
+  const sorted = [...players].sort(
+    (a, b) =>
+      getPlayerScore(b) -
+      getPlayerScore(a)
+  );
+
+  const oldPositions = new Map();
+
+  multiScoreboard
+    .querySelectorAll(".score-row")
+    .forEach((row) => {
+      const id =
+        row.dataset.playerId;
+
+      if (id) {
+        oldPositions.set(
+          id,
+          row.getBoundingClientRect().top
+        );
+      }
+    });
 
   sorted.forEach(
     (player, index) => {
-      const row =
-        document.createElement("div");
+      const playerId =
+        player.id ??
+        player.socketId ??
+        player.playerId;
 
-      row.className = "score-row";
+      const id =
+        String(playerId);
+
+      let row =
+        multiScoreboard.querySelector(
+          `.score-row[data-player-id="${CSS.escape(id)}"]`
+        );
+
+      if (!row) {
+        row =
+          document.createElement("div");
+
+        row.className =
+          "score-row";
+
+        row.dataset.playerId =
+          id;
+
+        const position =
+          document.createElement("span");
+
+        const name =
+          document.createElement("span");
+
+        const score =
+          document.createElement("strong");
+
+        row.appendChild(position);
+        row.appendChild(name);
+        row.appendChild(score);
+
+        multiScoreboard.appendChild(
+          row
+        );
+      }
 
       const position =
-        document.createElement("span");
-
-      position.className =
-        "score-position";
-
-      position.textContent =
-        String(index + 1);
+        row.children[0];
 
       const name =
-        document.createElement("span");
+        row.children[1];
 
-      name.className =
-        "score-name";
+      const score =
+        row.children[2];
+
+      position.textContent =
+        index === 0
+          ? "👑"
+          : String(index + 1);
 
       name.textContent =
         player.name ||
         player.username ||
         "Player";
 
-      const score =
-        document.createElement("strong");
-
-      score.className =
-        "score-value";
-
-      score.textContent =
+      const newScore =
         String(
           getPlayerScore(player)
         );
 
-      row.appendChild(position);
-      row.appendChild(name);
-      row.appendChild(score);
+      const oldScore =
+        score.textContent;
 
-      multiScoreboard.appendChild(row);
+      score.textContent =
+        newScore;
+
+      if (
+        oldScore &&
+        oldScore !== newScore
+      ) {
+        row.classList.remove(
+          "score-changed"
+        );
+
+        void row.offsetWidth;
+
+        row.classList.add(
+          "score-changed"
+        );
+      }
+
+      row.classList.toggle(
+        "leader",
+        index === 0
+      );
     }
   );
 
-  // Find the current player using any of the
-  // common socket/player ID property names.
-  const me =
-    players.find(
-      (player) => {
-        const id =
-          player.id ??
-          player.socketId ??
-          player.playerId;
+  sorted.forEach(
+    (player) => {
+      const playerId =
+        player.id ??
+        player.socketId ??
+        player.playerId;
 
-        return (
-          id !== undefined &&
-          String(id) ===
-            String(socket.id)
+      const row =
+        multiScoreboard.querySelector(
+          `.score-row[data-player-id="${CSS.escape(String(playerId))}"]`
+        );
+
+      if (row) {
+        multiScoreboard.appendChild(
+          row
         );
       }
+    }
+  );
+
+  multiScoreboard
+    .querySelectorAll(".score-row")
+    .forEach((row) => {
+      const id =
+        row.dataset.playerId;
+
+      const oldTop =
+        oldPositions.get(id);
+
+      if (oldTop === undefined) {
+        return;
+      }
+
+      const newTop =
+        row.getBoundingClientRect().top;
+
+      const difference =
+        oldTop - newTop;
+
+      if (
+        Math.abs(difference) < 1
+      ) {
+        return;
+      }
+
+      row.style.transform =
+        `translateY(${difference}px)`;
+
+      row.offsetHeight;
+
+      requestAnimationFrame(() => {
+        row.style.transform =
+          "translateY(0)";
+      });
+    });
+
+  const currentPlayer =
+    sorted.find(
+      (player) =>
+        String(
+          player.id ??
+          player.socketId ??
+          player.playerId
+        ) ===
+        String(socket.id)
     );
 
-  if (me && multiScore) {
+  if (
+    currentPlayer &&
+    multiScore
+  ) {
     multiScore.textContent =
       String(
-        getPlayerScore(me)
+        getPlayerScore(
+          currentPlayer
+        )
       );
   }
 
   if (multiPlayerCount) {
     multiPlayerCount.textContent =
-      String(players.length);
+      String(
+        sorted.length
+      );
   }
 }
-
 // ============================================================
 // MULTIPLAYER ROUND
 // ============================================================
@@ -2598,6 +2699,8 @@ function startMultiplayerRound(round) {
   multiState.started = true;
   multiState.finished = false;
   multiState.answered = false;
+  multiState.selectedAnswerId = null;
+  multiState.timeUp = false;
 
   multiState.roundNumber =
     Number(
@@ -2652,7 +2755,8 @@ function startMultiplayerRound(round) {
   );
 
   if (multiProgress) {
-    multiProgress.style.width = "0%";
+    multiProgress.style.width =
+      "0%";
   }
 
   if (multiPlayBtn) {
@@ -2884,23 +2988,88 @@ function startMultiAnswerTimer() {
       );
 
     if (multiRoundProgress) {
+      const progress =
+        (remaining / total) * 100;
+
       multiRoundProgress.style.width =
-        `${
-          (remaining / total) *
-          100
-        }%`;
+        `${progress}%`;
+
+      const progressRatio =
+        progress / 100;
+
+      const start = [
+        255,
+        255,
+        255
+      ];
+
+      const end = [
+        180,
+        90,
+        110
+      ];
+
+      const r =
+        Math.round(
+          start[0] +
+          (end[0] - start[0]) *
+            (1 - progressRatio)
+        );
+
+      const g =
+        Math.round(
+          start[1] +
+          (end[1] - start[1]) *
+            (1 - progressRatio)
+        );
+
+      const b =
+        Math.round(
+          start[2] +
+          (end[2] - start[2]) *
+            (1 - progressRatio)
+        );
+
+      multiRoundProgress.style.background =
+        `rgb(${r}, ${g}, ${b})`;
     }
 
+    // ========================================================
+    // TIME IS UP
+    // ========================================================
+
     if (remaining <= 0) {
-      if (!multiState.answered) {
-        submitMultiAnswer(null);
-      }
+      multiState.timeUp = true;
+      multiState.answered = true;
+
+      // Disable every answer button.
+      disableMultiChoices();
+
+      stopMultiAudio();
+
+      socket.emit(
+        "submitAnswer",
+        {
+          code:
+            multiState.partyCode,
+
+          partyCode:
+            multiState.partyCode,
+
+          answerId: null,
+
+          videoId: null
+        }
+      );
 
       return;
     }
 
     multiState.timer =
-      setTimeout(update, 50);
+      setTimeout(
+        update,
+        50
+      );
   }
 
   update();
@@ -2920,18 +3089,19 @@ function renderMultiChoices() {
   multiState.choices.forEach(
     (choice, index) => {
       const button =
-        document.createElement(
-          "button"
-        );
+        document.createElement("button");
 
       button.type = "button";
       button.className =
         "choice-button";
 
-      const number =
-        document.createElement(
-          "span"
+      button.dataset.answerId =
+        String(
+          getChoiceId(choice)
         );
+
+      const number =
+        document.createElement("span");
 
       number.className =
         "choice-number";
@@ -2940,9 +3110,7 @@ function renderMultiChoices() {
         String(index + 1);
 
       const title =
-        document.createElement(
-          "span"
-        );
+        document.createElement("span");
 
       title.className =
         "choice-title";
@@ -2956,59 +3124,181 @@ function renderMultiChoices() {
       button.addEventListener(
         "click",
         () => {
+          if (
+            button.disabled ||
+            multiState.answered ||
+            multiState.timeUp ||
+            !multiState.started
+          ) {
+            return;
+          }
+
           submitMultiAnswer(
             getChoiceId(choice)
           );
         }
       );
 
-      multiChoices.appendChild(button);
+      multiChoices.appendChild(
+        button
+      );
     }
   );
+
+  if (
+    multiState.answered ||
+    multiState.timeUp
+  ) {
+    disableMultiChoices();
+  }
 }
+
+// ============================================================
+// SUBMIT MULTIPLAYER ANSWER
+// ============================================================
 
 function submitMultiAnswer(answerId) {
   if (
     !multiState.started ||
-    multiState.answered
+    multiState.answered ||
+    multiState.timeUp
   ) {
     return;
   }
 
+  // Lock immediately.
   multiState.answered = true;
+  multiState.selectedAnswerId =
+    answerId;
 
   stopMultiAudio();
+
+  // Disable ALL buttons immediately.
   disableMultiChoices();
 
-  socket.emit("submitAnswer", {
-    code: multiState.partyCode,
-    partyCode: multiState.partyCode,
-    answerId: answerId,
-    videoId: answerId
-  });
+  socket.emit(
+    "submitAnswer",
+    {
+      code:
+        multiState.partyCode,
 
-  // if (answerId === null) {
-  //   showMultiAnswerStatus(
-  //     "Time's up!",
-  //     false
-  //   );
-  // } else {
-  //   showMultiAnswerStatus(
-  //     "Answer submitted!",
-  //     true
-  //   );
-  // }
+      partyCode:
+        multiState.partyCode,
+
+      answerId:
+        answerId,
+
+      videoId:
+        answerId
+    }
+  );
 }
+
+// ============================================================
+// DISABLE ALL MULTIPLAYER CHOICES
+// ============================================================
 
 function disableMultiChoices() {
-  multiChoices
-    ?.querySelectorAll("button")
-    .forEach(
-      (button) => {
-        button.disabled = true;
-      }
+  if (!multiChoices) {
+    return;
+  }
+
+  const buttons =
+    multiChoices.querySelectorAll(
+      ".choice-button"
     );
+
+  buttons.forEach(
+    (button) => {
+      button.disabled = true;
+
+      button.setAttribute(
+        "disabled",
+        ""
+      );
+
+      button.classList.add(
+        "disabled"
+      );
+
+      button.style.pointerEvents =
+        "none";
+    }
+  );
 }
+
+// ============================================================
+// MULTIPLAYER ANSWER RESULT
+// ============================================================
+
+function showMultiAnswerResult(data) {
+  const buttons =
+    multiChoices?.querySelectorAll(
+      ".choice-button"
+    );
+
+  if (!buttons) {
+    return;
+  }
+
+  buttons.forEach(
+    (button) => {
+      const choiceId =
+        String(
+          button.dataset.answerId
+        );
+
+      const correctId =
+        String(
+          data.correctAnswerId
+        );
+
+      const answerId =
+        data.answerId === null ||
+        data.answerId === undefined
+          ? null
+          : String(
+              data.answerId
+            );
+
+      button.classList.remove(
+        "correct",
+        "incorrect"
+      );
+
+      // Always show correct answer.
+      if (
+        choiceId === correctId
+      ) {
+        button.classList.add(
+          "correct"
+        );
+      }
+
+      // Show player's wrong answer.
+      if (
+        data.correct === false &&
+        answerId !== null &&
+        choiceId === answerId
+      ) {
+        button.classList.add(
+          "incorrect"
+        );
+      }
+
+      // Keep disabled.
+      button.disabled = true;
+
+      button.classList.add(
+        "disabled"
+      );
+    }
+  );
+}
+
+// ============================================================
+// MULTIPLAYER ANSWER STATUS
+// ============================================================
 
 function showMultiAnswerStatus(
   message,
@@ -3037,30 +3327,16 @@ function finishMultiplayerRound(data) {
   clearMultiTimers();
   stopMultiAudio();
 
+  // The round is over, so lock the current buttons.
+  multiState.answered = true;
+
+  disableMultiChoices();
+
   multiState.started = false;
-
-  showMultiRoundResult();
-
-  const answer =
-    data?.answer ||
-    data?.correctAnswer ||
-    data?.answerTitle ||
-    "Round complete";
-
-  if (roundAnswer) {
-    roundAnswer.textContent =
-      typeof answer === "string"
-        ? `Answer: ${answer}`
-        : `Answer: ${getChoiceTitle}`;
-  }
-
-  renderRoundResults(
-    data?.players ||
-      data?.results ||
-      data?.scoreboard ||
-      []
-  );
 }
+// ============================================================
+// MULTIPLAYER ROUND RESULT
+// ============================================================
 
 function showMultiRoundResult() {
   multiSetup?.classList.add("hidden");
@@ -3093,39 +3369,44 @@ function renderRoundResults(players) {
       getPlayerScore(a)
   );
 
-  sorted.forEach((player) => {
-    const row =
-      document.createElement(
-        "div"
+  sorted.forEach(
+    (player) => {
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.className =
+        "round-result-row";
+
+      const name =
+        document.createElement(
+          "span"
+        );
+
+      name.textContent =
+        player.name ||
+        player.username ||
+        "Player";
+
+      const points =
+        document.createElement(
+          "strong"
+        );
+
+      points.textContent =
+        formatScoreChange(player);
+
+      row.appendChild(name);
+      row.appendChild(points);
+
+      roundResults.appendChild(
+        row
       );
-
-    row.className =
-      "round-result-row";
-
-    const name =
-      document.createElement(
-        "span"
-      );
-
-    name.textContent =
-      player.name ||
-      player.username ||
-      "Player";
-
-    const points =
-      document.createElement(
-        "strong"
-      );
-
-    points.textContent =
-      formatScoreChange(player);
-
-    row.appendChild(name);
-    row.appendChild(points);
-
-    roundResults.appendChild(row);
-  });
+    }
+  );
 }
+
 // ============================================================
 // FINAL SCOREBOARD
 // ============================================================
@@ -3155,7 +3436,14 @@ function renderFinalScoreboard(players) {
           "div"
         );
 
-      row.className = "score-row";
+      row.className =
+        "score-row";
+
+      if (index === 0) {
+        row.classList.add(
+          "leader"
+        );
+      }
 
       const position =
         document.createElement(
@@ -3181,13 +3469,17 @@ function renderFinalScoreboard(players) {
         );
 
       score.textContent =
-        String(player.score || 0);
+        String(
+          player.score || 0
+        );
 
       row.appendChild(position);
       row.appendChild(name);
       row.appendChild(score);
 
-      finalScoreboard.appendChild(row);
+      finalScoreboard.appendChild(
+        row
+      );
     }
   );
 }
@@ -3197,37 +3489,93 @@ function renderFinalScoreboard(players) {
 // ============================================================
 
 function showMultiSetup() {
-  multiSetup?.classList.remove("hidden");
-  multiLobby?.classList.add("hidden");
-  multiGame?.classList.add("hidden");
-  multiRoundResult?.classList.add("hidden");
-  multiFinalResult?.classList.add("hidden");
+  multiSetup?.classList.remove(
+    "hidden"
+  );
+
+  multiLobby?.classList.add(
+    "hidden"
+  );
+
+  multiGame?.classList.add(
+    "hidden"
+  );
+
+  multiRoundResult?.classList.add(
+    "hidden"
+  );
+
+  multiFinalResult?.classList.add(
+    "hidden"
+  );
 }
 
 function showMultiLobby() {
-  multiSetup?.classList.add("hidden");
-  multiLobby?.classList.remove("hidden");
-  multiGame?.classList.add("hidden");
-  multiRoundResult?.classList.add("hidden");
-  multiFinalResult?.classList.add("hidden");
+  multiSetup?.classList.add(
+    "hidden"
+  );
+
+  multiLobby?.classList.remove(
+    "hidden"
+  );
+
+  multiGame?.classList.add(
+    "hidden"
+  );
+
+  multiRoundResult?.classList.add(
+    "hidden"
+  );
+
+  multiFinalResult?.classList.add(
+    "hidden"
+  );
 
   updateLobbyUI();
 }
 
 function showMultiGame() {
-  multiSetup?.classList.add("hidden");
-  multiLobby?.classList.add("hidden");
-  multiGame?.classList.remove("hidden");
-  multiRoundResult?.classList.add("hidden");
-  multiFinalResult?.classList.add("hidden");
+  multiSetup?.classList.add(
+    "hidden"
+  );
+
+  multiLobby?.classList.add(
+    "hidden"
+  );
+
+  multiGame?.classList.remove(
+    "hidden"
+  );
+
+  multiRoundResult?.classList.add(
+    "hidden"
+  );
+
+  multiFinalResult?.classList.add(
+    "hidden"
+  );
 }
 
 function showMultiFinal() {
-  multiSetup?.classList.add("hidden");
-  multiLobby?.classList.add("hidden");
-  multiGame?.classList.add("hidden");
-  multiRoundResult?.classList.add("hidden");
-  multiFinalResult?.classList.remove("hidden");
+  multiSetup?.classList.add(
+    "hidden"
+  );
+
+  multiLobby?.classList.add(
+    "hidden"
+  );
+
+  multiGame?.classList.add(
+    "hidden"
+  );
+
+  multiRoundResult?.classList.add(
+    "hidden"
+  );
+
+  multiFinalResult?.classList.remove(
+    "hidden"
+  );
 
   if (finalNewGameBtn) {
     finalNewGameBtn.classList.toggle(
@@ -3273,6 +3621,7 @@ function resetMultiState() {
   multiState.inParty = false;
   multiState.partyCode = null;
   multiState.isHost = false;
+  multiState.hostId = null;
 
   multiState.started = false;
   multiState.finished = false;
@@ -3289,6 +3638,9 @@ function resetMultiState() {
   multiState.choices = [];
   multiState.answered = false;
   multiState.players = [];
+
+  multiState.selectedAnswerId = null;
+  multiState.timeUp = false;
 
   if (multiScoreboard) {
     multiScoreboard.innerHTML = "";
@@ -3312,32 +3664,6 @@ function resetMultiState() {
     multiAnswerStatus.className =
       "answer-status hidden";
   }
-}
-
-// ============================================================
-// RESET SINGLE STATE
-// ============================================================
-
-function resetSingleState() {
-  clearSingleTimers();
-  stopSingleAudio();
-
-  singleState.score = 0;
-  singleState.round = 0;
-
-  singleState.roundId = null;
-  singleState.answerId = null;
-  singleState.choices = [];
-
-  singleState.startTime = 0;
-  singleState.audioDuration = 0;
-
-  singleState.revealDuration =
-    SINGLE_REVEAL_TIMINGS[0];
-
-  singleState.playing = false;
-  singleState.answered = false;
-  singleState.gameActive = false;
 }
 
 // ============================================================
@@ -3486,6 +3812,10 @@ function formatScoreChange(player) {
     player.score || 0
   );
 }
+
+// ============================================================
+// CONFETTI
+// ============================================================
 
 function showWinConfetti() {
   if (typeof confetti !== "function") {

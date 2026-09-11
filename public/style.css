@@ -711,10 +711,26 @@ form .primary {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-.choice-button:disabled {
-  opacity: 0.55;
-  cursor: default;
-  transform: none;
+.choice-button.correct {
+  background: #173a2a;
+  border-color: #4fd18b;
+  color: #85e3b0;
+}
+
+.choice-button.correct .choice-number {
+  background: #286044;
+  color: #b8f5d3;
+}
+
+.choice-button.incorrect {
+  background: #3d2228;
+  border-color: #e06464;
+  color: #ffaaa9;
+}
+
+.choice-button.incorrect .choice-number {
+  background: #69343b;
+  color: #ffc1c1;
 }
 
 .choice-number {
@@ -771,9 +787,9 @@ form .primary {
   color: #101218;
 }
 
-/* ==========================================================
+/* ============================================================
    SCOREBOARD
-   ========================================================== */
+   ============================================================ */
 
 .score-title {
   margin: 32px auto 10px;
@@ -789,20 +805,81 @@ form .primary {
   text-align: left;
 }
 
+/* ============================================================
+   LIVE SCOREBOARD
+   ============================================================ */
+
 .score-row {
+  position: relative;
+
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
 
-  padding: 12px 2px;
+  padding: 12px 10px;
 
   border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+
+  transition:
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+
+  will-change: transform;
 }
 
 .score-row > span:first-child {
   color: #7f8b9f;
   font-weight: 700;
+}
+
+/* ------------------------------------------------------------
+   LEADER
+   ------------------------------------------------------------ */
+
+.score-row.leader {
+  background:
+    linear-gradient(
+      145deg,
+      #292438,
+      #211d30
+    );
+
+  box-shadow:
+    0 0 20px rgba(255, 215, 80, 0.16);
+}
+
+.score-row.leader > span:first-child {
+  color: #ffd95a;
+  font-size: 1.15em;
+}
+
+.score-row.leader strong {
+  font-size: 1.12em;
+}
+
+/* ------------------------------------------------------------
+   SCORE CHANGE
+   ------------------------------------------------------------ */
+
+.score-row.score-changed strong {
+  animation: scorePop 0.45s ease;
+}
+
+@keyframes scorePop {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.3);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* ==========================================================
@@ -911,6 +988,25 @@ form .primary {
   color: #69758b;
 }
 
+.choice-button:disabled,
+.choice-button.disabled {
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  opacity: 0.4 !important;
+}
+
+.choice-button.disabled .choice-number {
+  background: #353b48 !important;
+  color: #858d9c !important;
+}
+
+.choice-button.disabled.correct {
+  opacity: 1 !important;
+}
+
+.choice-button.disabled.incorrect {
+  opacity: 1 !important;
+}
 /* ==========================================================
    MOBILE
    ========================================================== */
