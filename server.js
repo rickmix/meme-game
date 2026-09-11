@@ -3667,7 +3667,7 @@ io.on(
             Math.max(
               1,
               Math.round(
-                100 *
+                10000 *
                   (
                     remaining /
                     ROUND_DURATION
