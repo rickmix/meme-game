@@ -10,6 +10,7 @@ import {
 import { io } from "socket.io-client";
 import confetti from "canvas-confetti";
 
+import Scoreboard from "./Scoreboard.jsx";
 import Lobby from "./Lobby.jsx";
 
 const socket = io();
@@ -2248,76 +2249,11 @@ const renderScoreboard =
 
             </div>
 
-            <div
-              id="multiScoreboard"
+            <Scoreboard
               ref={scoreboardRowsRef}
-              className="scoreboard"
-            >
-              {[...state.players]
-                .sort(
-                  (a, b) =>
-                    getPlayerScore(b) -
-                    getPlayerScore(a)
-                )
-                .map(
-                  (
-                    player,
-                    index
-                  ) => {
-                    const playerId =
-                      getPlayerId(
-                        player
-                      );
-
-                    const roundScore =
-                      roundScoresRef.current.get(
-                        String(
-                          playerId
-                        )
-                      ) ?? 0;
-
-                    return (
-                      <div
-                        key={String(
-                          playerId
-                        )}
-                        data-player-id={String(
-                          playerId
-                        )}
-                        className={`score-row ${
-                          index === 0
-                            ? "leader"
-                            : ""
-                        }`}
-                      >
-                        <span>
-                          {index + 1}
-                        </span>
-
-                        <span>
-                          {getPlayerName(
-                            player
-                          )}
-                        </span>
-
-                        <strong>
-                          {player?.score ??
-                            0}
-
-                          {/* <span className="round-score">
-                            {" "}
-                            {roundScore > 0 && (
-                              <span>
-                                (+{roundScore})
-                              </span>
-                            )}
-                          </span> */}
-                        </strong>
-                      </div>
-                    );
-                  }
-                )}
-            </div>
+              players={state.players}
+              roundScores={roundScoresRef.current}
+            />
 
           </section>
         )}
