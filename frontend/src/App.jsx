@@ -83,7 +83,7 @@ function App() {
           </div>
 
           <h1>
-            Meme master
+            Meme master 3000
           </h1>
         </div>
 
