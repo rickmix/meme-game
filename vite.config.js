@@ -5,27 +5,17 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
 
-  root: path.resolve(__dirname, "frontend"),
+  root: path.resolve(
+    __dirname,
+    "frontend"
+  ),
 
   build: {
-    outDir: path.resolve(__dirname, "public"),
-    emptyOutDir: true,
+    outDir: path.resolve(
+      __dirname,
+      "public"
+    ),
 
-    rollupOptions: {
-      input: {
-        index: path.resolve(
-          __dirname,
-          "frontend/index.html"
-        ),
-        admin: path.resolve(
-          __dirname,
-          "frontend/admin.html"
-        ),
-        "admin-login": path.resolve(
-          __dirname,
-          "frontend/admin-login.html"
-        )
-      }
-    }
+    emptyOutDir: true
   }
 });

@@ -610,7 +610,7 @@ form .primary {
 .player-row {
   display: grid;
   grid-template-columns:
-    42px
+    50%
     minmax(0, 1fr)
     auto;
   align-items: center;

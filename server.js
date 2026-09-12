@@ -2230,6 +2230,7 @@ function requireAdmin(
 // ADMIN LOGIN
 // ============================================================
 
+// POST: perform admin login
 app.post(
   "/admin-login",
   (req, res) => {
@@ -2293,7 +2294,6 @@ app.post(
     });
   }
 );
-
 // ============================================================
 // ADMIN LOGOUT
 // ============================================================
@@ -2327,11 +2327,12 @@ app.post(
 );
 
 // ============================================================
-// ADMIN PAGE
+// ADMIN PAGES
 // ============================================================
 
+// GET: show admin page
 app.get(
-  "/admin.html",
+  "/admin",
   (req, res) => {
     if (
       !isAdminAuthenticated(
@@ -2339,19 +2340,31 @@ app.get(
       )
     ) {
       return res.redirect(
-        "/"
+        "/admin-login"
       );
     }
 
     res.sendFile(
       path.join(
         PUBLIC,
-        "admin.html"
+        "index.html"
       )
     );
   }
 );
 
+  // GET: show admin login page
+  app.get(
+    "/admin-login",
+    (req, res) => {
+      res.sendFile(
+        path.join(
+          PUBLIC,
+          "index.html"
+        )
+      );
+    }
+  );
 // ============================================================
 // GET ONLINE VIDEOS
 // ============================================================

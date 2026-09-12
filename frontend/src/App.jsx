@@ -5,8 +5,25 @@ import {
 
 import SinglePlayer from "./game/SinglePlayer.jsx";
 import Multiplayer from "./game/Multiplayer.jsx";
+import Admin from "./admin/Admin.jsx";
+import AdminLogin from "./admin/AdminLogin.jsx";
 
 function App() {
+  const path =
+    window.location.pathname;
+
+  if (path === "/admin") {
+    return <Admin />;
+  }
+
+  if (path === "/admin-login") {
+    return <AdminLogin />;
+  }
+
+  return <Game />;
+}
+
+function Game() {
   const [mode, setMode] =
     useState("single");
 
@@ -86,8 +103,6 @@ function App() {
             Meme master 3000
           </h1>
         </div>
-
-       
       </header>
 
       <div className="tabs">
