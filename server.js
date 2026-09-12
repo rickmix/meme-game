@@ -7,7 +7,6 @@ const path = require("path");
 const http = require("http");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
-const VAD = require("node-vad");
 
 const { Server } = require("socket.io");
 const { createClient } = require("@supabase/supabase-js");
@@ -4263,9 +4262,10 @@ io.on(
             points;
         }
 
-        socket.emit(
+        io.to(party.code).emit(
           "answerAccepted",
           {
+            playerId: player.id,
             correct,
             points,
             score: player.score,

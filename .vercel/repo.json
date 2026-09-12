@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_JaGVTzEQGZ892Hdt2O72IBsUrqAu",
+      "name": "meme-game",
+      "directory": ".",
+      "orgId": "team_y5e3J9CTOOAp2ofHsDEqBbTi"
+    }
+  ]
+}
