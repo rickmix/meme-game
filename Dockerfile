@@ -5,6 +5,7 @@ RUN apt-get update \
        ffmpeg \
        python3 \
        python3-venv \
+       build-essential \
     && python3 -m venv /opt/yt-dlp \
     && /opt/yt-dlp/bin/pip install --no-cache-dir -U yt-dlp \
     && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp \
