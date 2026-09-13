@@ -2,19 +2,19 @@ import { useRef, useState } from "react";
 
 import SinglePlayer from "./game/SinglePlayer.jsx";
 import Multiplayer from "./game/Multiplayer.jsx";
-import Admin from "./admin/Admin.jsx";
-import AdminLogin from "./admin/AdminLogin.jsx";
+// import Admin from "./admin/Admin.jsx";
+// import AdminLogin from "./admin/AdminLogin.jsx";
 
 function App() {
-  const path = window.location.pathname;
+  // const path = window.location.pathname;
 
-  if (path === "/admin") {
-    return <Admin />;
-  }
+  // if (path === "/admin") {
+  //   return <Admin />;
+  // }
 
-  if (path === "/admin-login") {
-    return <AdminLogin />;
-  }
+  // if (path === "/admin-login") {
+  //   return <AdminLogin />;
+  // }
 
   return <Game />;
 }

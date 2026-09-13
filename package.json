@@ -5,7 +5,7 @@
   "description": "Guess the YouTube video from an automatically selected audio clip.",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
+    "dev": "vite",
     "build": "vite build"
   },
   "dependencies": {
