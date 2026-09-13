@@ -15,12 +15,10 @@ const {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
-  GetObjectCommand
+  GetObjectCommand,
 } = require("@aws-sdk/client-s3");
 
-const {
-  getSignedUrl
-} = require("@aws-sdk/s3-request-presigner");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 const execFileAsync = promisify(execFile);
 
@@ -34,8 +32,8 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: true,
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 const PORT = process.env.PORT || 3000;
@@ -53,15 +51,11 @@ const PORT = process.env.PORT || 3000;
 // Production:
 //   YouTube -> processing -> R2 + Supabase
 
-const APP_ENV =
-  process.env.APP_ENV || "production";
+const APP_ENV = process.env.APP_ENV || "production";
 
-const IS_LOCAL =
-  APP_ENV === "local";
+const IS_LOCAL = APP_ENV === "local";
 
-console.log(
-  `Application environment: ${APP_ENV}`
-);
+console.log(`Application environment: ${APP_ENV}`);
 
 // ============================================================
 // PATHS
@@ -69,86 +63,43 @@ console.log(
 
 const ROOT = __dirname;
 
-const DATA =
-  path.join(
-    ROOT,
-    "data"
-  );
+const DATA = path.join(ROOT, "data");
 
-const AUDIO =
-  path.join(
-    DATA,
-    "audio"
-  );
+const AUDIO = path.join(DATA, "audio");
 
-const VIDEOS =
-  path.join(
-    DATA,
-    "videos"
-  );
+const VIDEOS = path.join(DATA, "videos");
 
-const PUBLIC =
-  path.join(
-    ROOT,
-    "public"
-  );
+const PUBLIC = path.join(ROOT, "public");
 
 // Local staging/backup directory.
 // These files are NOT part of the live database.
 
-const BACKUP =
-  path.join(
-    ROOT,
-    "backup"
-  );
+const BACKUP = path.join(ROOT, "backup");
 
-const BACKUP_AUDIO =
-  path.join(
-    BACKUP,
-    "audio"
-  );
+const BACKUP_AUDIO = path.join(BACKUP, "audio");
 
-const BACKUP_VIDEOS_JSON =
-  path.join(
-    BACKUP,
-    "videos.json"
-  );
+const BACKUP_VIDEOS_JSON = path.join(BACKUP, "videos.json");
 
-fs.mkdirSync(
-  DATA,
-  {
-    recursive: true
-  }
-);
+fs.mkdirSync(DATA, {
+  recursive: true,
+});
 
-fs.mkdirSync(
-  AUDIO,
-  {
-    recursive: true
-  }
-);
+fs.mkdirSync(AUDIO, {
+  recursive: true,
+});
 
-fs.mkdirSync(
-  VIDEOS,
-  {
-    recursive: true
-  }
-);
+fs.mkdirSync(VIDEOS, {
+  recursive: true,
+});
 
 if (IS_LOCAL) {
-  fs.mkdirSync(
-    BACKUP,
-    {
-      recursive: true
-    }
-  );
+  fs.mkdirSync(BACKUP, {
+    recursive: true,
+  });
 
-  fs.mkdirSync(
-    BACKUP_AUDIO,
-    {
-      recursive: true
-    }
-  );
+  fs.mkdirSync(BACKUP_AUDIO, {
+    recursive: true,
+  });
 }
 
 // ============================================================
@@ -156,71 +107,45 @@ if (IS_LOCAL) {
 // ============================================================
 
 // Render secret
-const secretCookies =
-  "/etc/secrets/youtube-cookies.txt";
+const secretCookies = "/etc/secrets/youtube-cookies.txt";
 
-const writableCookies =
-  "/tmp/youtube-cookies.txt";
+const writableCookies = "/tmp/youtube-cookies.txt";
 
-if (
-  !IS_LOCAL &&
-  fs.existsSync(secretCookies)
-) {
-  fs.copyFileSync(
-    secretCookies,
-    writableCookies
-  );
+if (!IS_LOCAL && fs.existsSync(secretCookies)) {
+  fs.copyFileSync(secretCookies, writableCookies);
 }
 
 function youtubeArgs(args) {
   if (IS_LOCAL) {
-    return [
-      "--cookies-from-browser",
-      "firefox",
-      ...args
-    ];
+    return ["--cookies-from-browser", "firefox", ...args];
   }
 
-  return [
-    "--cookies",
-    writableCookies,
-    ...args
-  ];
+  return ["--cookies", writableCookies, ...args];
 }
 
 // ============================================================
 // ENVIRONMENT VARIABLES
 // ============================================================
 
-const ADMIN_PASSWORD =
-  process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // ============================================================
 // SUPABASE
 // ============================================================
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL;
 
-const SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (
-  !SUPABASE_URL ||
-  !SUPABASE_SERVICE_ROLE_KEY
-) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error(
-    "ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured."
+    "ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be configured.",
   );
 
   process.exit(1);
 }
 
-const supabase =
-  createClient(
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY
-  );
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // IMPORTANT:
 //
@@ -235,17 +160,13 @@ let videoDb = [];
 // CLOUDFLARE R2
 // ============================================================
 
-const R2_ACCOUNT_ID =
-  process.env.R2_ACCOUNT_ID;
+const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 
-const R2_ACCESS_KEY_ID =
-  process.env.R2_ACCESS_KEY_ID;
+const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 
-const R2_SECRET_ACCESS_KEY =
-  process.env.R2_SECRET_ACCESS_KEY;
+const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 
-const R2_BUCKET_NAME =
-  process.env.R2_BUCKET_NAME;
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
 if (
   !R2_ACCOUNT_ID ||
@@ -253,42 +174,30 @@ if (
   !R2_SECRET_ACCESS_KEY ||
   !R2_BUCKET_NAME
 ) {
-  console.error(
-    "ERROR: R2 environment variables must be configured."
-  );
+  console.error("ERROR: R2 environment variables must be configured.");
 
   process.exit(1);
 }
 
-const r2 =
-  new S3Client({
-    region: "auto",
+const r2 = new S3Client({
+  region: "auto",
 
-    endpoint:
-      `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
 
-    credentials: {
-      accessKeyId:
-        R2_ACCESS_KEY_ID,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
 
-      secretAccessKey:
-        R2_SECRET_ACCESS_KEY
-    }
-  });
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
+});
 
 // ============================================================
 // MIDDLEWARE
 // ============================================================
 
-app.use(
-  express.json()
-);
+app.use(express.json());
 
-app.use(
-  express.static(
-    PUBLIC
-  )
-);
+app.use(express.static(PUBLIC));
 
 // Do NOT expose:
 //
@@ -302,50 +211,27 @@ app.use(
 // SUPABASE HELPERS
 // ============================================================
 
-function getAudioKey(
-  id
-) {
+function getAudioKey(id) {
   return `audio/${id}.mp3`;
 }
 
-function fromSupabase(
-  row
-) {
+function fromSupabase(row) {
   return {
-    id:
-      row.id,
+    id: row.id,
 
-    title:
-      row.title,
+    title: row.title,
 
-    channel:
-      row.channel || "",
+    channel: row.channel || "",
 
-    duration:
-      Number(
-        row.duration
-      ) || 0,
+    duration: Number(row.duration) || 0,
 
-    goodSections:
-      Array.isArray(
-        row.good_sections
-      )
-        ? row.good_sections
-        : [],
+    goodSections: Array.isArray(row.good_sections) ? row.good_sections : [],
 
-    ready:
-      Boolean(
-        row.ready
-      ),
+    ready: Boolean(row.ready),
 
-    createdAt:
-      row.created_at,
+    createdAt: row.created_at,
 
-    audioUrl:
-      row.audio_url ||
-      getAudioKey(
-        row.id
-      )
+    audioUrl: row.audio_url || getAudioKey(row.id),
   };
 }
 
@@ -364,32 +250,20 @@ function fromSupabase(
 //
 
 async function loadDb() {
-  const {
-    data,
-    error
-  } =
-    await supabase
-      .from("videos")
-      .select("*")
-      .order(
-        "created_at",
-        {
-          ascending: true
-        }
-      );
+  const { data, error } = await supabase
+    .from("videos")
+    .select("*")
+    .order("created_at", {
+      ascending: true,
+    });
 
   if (error) {
     throw error;
   }
 
-  videoDb =
-    (data || []).map(
-      fromSupabase
-    );
+  videoDb = (data || []).map(fromSupabase);
 
-  console.log(
-    `Loaded ${videoDb.length} videos from Supabase.`
-  );
+  console.log(`Loaded ${videoDb.length} videos from Supabase.`);
 
   return videoDb;
 }
@@ -408,206 +282,107 @@ function readDb() {
 // Local mode does not call these.
 //
 
-async function insertVideo(
-  video
-) {
+async function insertVideo(video) {
   const row = {
-    id:
-      video.id,
+    id: video.id,
 
-    title:
-      video.title ||
-      `YouTube video ${video.id}`,
+    title: video.title || `YouTube video ${video.id}`,
 
-    channel:
-      video.channel || "",
+    channel: video.channel || "",
 
-    duration:
-      Number(
-        video.duration
-      ) || 0,
+    duration: Number(video.duration) || 0,
 
-    good_sections:
-      Array.isArray(
-        video.goodSections
-      )
-        ? video.goodSections
-        : [],
+    good_sections: Array.isArray(video.goodSections) ? video.goodSections : [],
 
-    ready:
-      Boolean(
-        video.ready
-      ),
+    ready: Boolean(video.ready),
 
-    created_at:
-      video.createdAt ||
-      new Date().toISOString(),
+    created_at: video.createdAt || new Date().toISOString(),
 
-    audio_url:
-      video.audioUrl ||
-      getAudioKey(
-        video.id
-      )
+    audio_url: video.audioUrl || getAudioKey(video.id),
   };
 
-  const {
-    data,
-    error
-  } =
-    await supabase
-      .from("videos")
-      .insert(row)
-      .select()
-      .single();
+  const { data, error } = await supabase
+    .from("videos")
+    .insert(row)
+    .select()
+    .single();
 
   if (error) {
     throw error;
   }
 
-  const result =
-    fromSupabase(
-      data
-    );
+  const result = fromSupabase(data);
 
-  videoDb.push(
-    result
-  );
+  videoDb.push(result);
 
   return result;
 }
 
-async function updateVideo(
-  id,
-  updates
-) {
+async function updateVideo(id, updates) {
   const payload = {};
 
-  if (
-    updates.title !==
-    undefined
-  ) {
-    payload.title =
-      updates.title;
+  if (updates.title !== undefined) {
+    payload.title = updates.title;
   }
 
-  if (
-    updates.channel !==
-    undefined
-  ) {
-    payload.channel =
-      updates.channel;
+  if (updates.channel !== undefined) {
+    payload.channel = updates.channel;
   }
 
-  if (
-    updates.duration !==
-    undefined
-  ) {
-    payload.duration =
-      Number(
-        updates.duration
-      ) || 0;
+  if (updates.duration !== undefined) {
+    payload.duration = Number(updates.duration) || 0;
   }
 
-  if (
-    updates.goodSections !==
-    undefined
-  ) {
-    payload.good_sections =
-      Array.isArray(
-        updates.goodSections
-      )
-        ? updates.goodSections
-        : [];
+  if (updates.goodSections !== undefined) {
+    payload.good_sections = Array.isArray(updates.goodSections)
+      ? updates.goodSections
+      : [];
   }
 
-  if (
-    updates.ready !==
-    undefined
-  ) {
-    payload.ready =
-      Boolean(
-        updates.ready
-      );
+  if (updates.ready !== undefined) {
+    payload.ready = Boolean(updates.ready);
   }
 
-  if (
-    updates.audioUrl !==
-    undefined
-  ) {
-    payload.audio_url =
-      updates.audioUrl;
+  if (updates.audioUrl !== undefined) {
+    payload.audio_url = updates.audioUrl;
   }
 
-  if (
-    payload.audio_url ===
-    undefined
-  ) {
-    payload.audio_url =
-      getAudioKey(
-        id
-      );
+  if (payload.audio_url === undefined) {
+    payload.audio_url = getAudioKey(id);
   }
 
-  const {
-    data,
-    error
-  } =
-    await supabase
-      .from("videos")
-      .update(payload)
-      .eq("id", id)
-      .select()
-      .single();
+  const { data, error } = await supabase
+    .from("videos")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
 
   if (error) {
     throw error;
   }
 
-  const updated =
-    fromSupabase(
-      data
-    );
+  const updated = fromSupabase(data);
 
-  const index =
-    videoDb.findIndex(
-      v =>
-        v.id === id
-    );
+  const index = videoDb.findIndex((v) => v.id === id);
 
-  if (
-    index !== -1
-  ) {
-    videoDb[index] =
-      updated;
+  if (index !== -1) {
+    videoDb[index] = updated;
   } else {
-    videoDb.push(
-      updated
-    );
+    videoDb.push(updated);
   }
 
   return updated;
 }
 
-async function deleteVideoFromDb(
-  id
-) {
-  const {
-    error
-  } =
-    await supabase
-      .from("videos")
-      .delete()
-      .eq("id", id);
+async function deleteVideoFromDb(id) {
+  const { error } = await supabase.from("videos").delete().eq("id", id);
 
   if (error) {
     throw error;
   }
 
-  videoDb =
-    videoDb.filter(
-      v =>
-        v.id !== id
-    );
+  videoDb = videoDb.filter((v) => v.id !== id);
 }
 
 // ============================================================
@@ -615,288 +390,155 @@ async function deleteVideoFromDb(
 // ============================================================
 
 function readBackupVideos() {
-  if (
-    !fs.existsSync(
-      BACKUP_VIDEOS_JSON
-    )
-  ) {
+  if (!fs.existsSync(BACKUP_VIDEOS_JSON)) {
     return [];
   }
 
   try {
-    const content =
-      fs.readFileSync(
-        BACKUP_VIDEOS_JSON,
-        "utf8"
-      );
+    const content = fs.readFileSync(BACKUP_VIDEOS_JSON, "utf8");
 
-    if (
-      !content.trim()
-    ) {
+    if (!content.trim()) {
       return [];
     }
 
-    const data =
-      JSON.parse(
-        content
-      );
+    const data = JSON.parse(content);
 
-    if (
-      !Array.isArray(data)
-    ) {
-      throw new Error(
-        "backup/videos.json must contain an array."
-      );
+    if (!Array.isArray(data)) {
+      throw new Error("backup/videos.json must contain an array.");
     }
 
     return data;
-  } catch (
-    error
-  ) {
-    throw new Error(
-      `Could not read backup/videos.json: ${error.message}`
-    );
+  } catch (error) {
+    throw new Error(`Could not read backup/videos.json: ${error.message}`);
   }
 }
 
-function writeBackupVideos(
-  videos
-) {
-  fs.mkdirSync(
-    BACKUP,
-    {
-      recursive: true
-    }
-  );
+function writeBackupVideos(videos) {
+  fs.mkdirSync(BACKUP, {
+    recursive: true,
+  });
 
-  fs.mkdirSync(
-    BACKUP_AUDIO,
-    {
-      recursive: true
-    }
-  );
+  fs.mkdirSync(BACKUP_AUDIO, {
+    recursive: true,
+  });
 
-  const tempFile =
-    `${BACKUP_VIDEOS_JSON}.tmp`;
+  const tempFile = `${BACKUP_VIDEOS_JSON}.tmp`;
 
-  fs.writeFileSync(
-    tempFile,
-    JSON.stringify(
-      videos,
-      null,
-      2
-    ),
-    "utf8"
-  );
+  fs.writeFileSync(tempFile, JSON.stringify(videos, null, 2), "utf8");
 
-  fs.renameSync(
-    tempFile,
-    BACKUP_VIDEOS_JSON
-  );
+  fs.renameSync(tempFile, BACKUP_VIDEOS_JSON);
 }
 
-function saveBackupVideo(
-  video
-) {
-  const videos =
-    readBackupVideos();
+function saveBackupVideo(video) {
+  const videos = readBackupVideos();
 
-  const index =
-    videos.findIndex(
-      item =>
-        item.id ===
-        video.id
-    );
+  const index = videos.findIndex((item) => item.id === video.id);
 
   const backupVideo = {
-    id:
-      video.id,
+    id: video.id,
 
-    title:
-      video.title ||
-      `YouTube video ${video.id}`,
+    title: video.title || `YouTube video ${video.id}`,
 
-    channel:
-      video.channel || "",
+    channel: video.channel || "",
 
-    duration:
-      Number(
-        video.duration
-      ) || 0,
+    duration: Number(video.duration) || 0,
 
-    goodSections:
-      Array.isArray(
-        video.goodSections
-      )
-        ? video.goodSections
-        : [],
+    goodSections: Array.isArray(video.goodSections) ? video.goodSections : [],
 
-    ready:
-      true,
+    ready: true,
 
-    createdAt:
-      video.createdAt ||
-      new Date().toISOString(),
+    createdAt: video.createdAt || new Date().toISOString(),
 
     // This is the future R2 key.
-    audioUrl:
-      getAudioKey(
-        video.id
-      )
+    audioUrl: getAudioKey(video.id),
   };
 
-  if (
-    index === -1
-  ) {
-    videos.push(
-      backupVideo
-    );
+  if (index === -1) {
+    videos.push(backupVideo);
   } else {
-    videos[index] =
-      backupVideo;
+    videos[index] = backupVideo;
   }
 
-  writeBackupVideos(
-    videos
-  );
+  writeBackupVideos(videos);
 
   return backupVideo;
 }
 
-function removeBackupVideo(
-  id
-) {
-  const videos =
-    readBackupVideos();
+function removeBackupVideo(id) {
+  const videos = readBackupVideos();
 
-  const filtered =
-    videos.filter(
-      video =>
-        video.id !== id
-    );
+  const filtered = videos.filter((video) => video.id !== id);
 
-  writeBackupVideos(
-    filtered
-  );
+  writeBackupVideos(filtered);
 
-  fs.rmSync(
-    path.join(
-      BACKUP_AUDIO,
-      `${id}.mp3`
-    ),
-    {
-      force: true
-    }
-  );
+  fs.rmSync(path.join(BACKUP_AUDIO, `${id}.mp3`), {
+    force: true,
+  });
 }
 
-function backupVideoExists(
-  id
-) {
-  return readBackupVideos()
-    .some(
-      video =>
-        video.id === id
-    );
+function backupVideoExists(id) {
+  return readBackupVideos().some((video) => video.id === id);
 }
 
 // ============================================================
 // R2 HELPERS
 // ============================================================
 
-async function uploadAudioToR2(
-  id,
-  file
-) {
-  const key =
-    getAudioKey(
-      id
-    );
+async function uploadAudioToR2(id, file) {
+  const key = getAudioKey(id);
 
-  console.log(
-    `Uploading ${id}.mp3 to R2...`
-  );
+  console.log(`Uploading ${id}.mp3 to R2...`);
 
   await r2.send(
     new PutObjectCommand({
-      Bucket:
-        R2_BUCKET_NAME,
+      Bucket: R2_BUCKET_NAME,
 
-      Key:
-        key,
+      Key: key,
 
-      Body:
-        fs.createReadStream(
-          file
-        ),
+      Body: fs.createReadStream(file),
 
-      ContentType:
-        "audio/mpeg"
-    })
+      ContentType: "audio/mpeg",
+    }),
   );
 
-  console.log(
-    `Uploaded ${id}.mp3 to R2.`
-  );
+  console.log(`Uploaded ${id}.mp3 to R2.`);
 
   return key;
 }
 
-async function deleteAudioFromR2(
-  id
-) {
-  const key =
-    getAudioKey(
-      id
-    );
+async function deleteAudioFromR2(id) {
+  const key = getAudioKey(id);
 
   try {
     await r2.send(
       new DeleteObjectCommand({
-        Bucket:
-          R2_BUCKET_NAME,
+        Bucket: R2_BUCKET_NAME,
 
-        Key:
-          key
-      })
+        Key: key,
+      }),
     );
 
-    console.log(
-      `Deleted ${key} from R2.`
-    );
-  } catch (
-    error
-  ) {
-    console.error(
-      `Could not delete ${key} from R2:`,
-      error.message
-    );
+    console.log(`Deleted ${key} from R2.`);
+  } catch (error) {
+    console.error(`Could not delete ${key} from R2:`, error.message);
   }
 }
 
-async function getAudioUrl(
-  id
-) {
-  const key =
-    getAudioKey(
-      id
-    );
+async function getAudioUrl(id) {
+  const key = getAudioKey(id);
 
   return getSignedUrl(
     r2,
 
     new GetObjectCommand({
-      Bucket:
-        R2_BUCKET_NAME,
+      Bucket: R2_BUCKET_NAME,
 
-      Key:
-        key
+      Key: key,
     }),
 
     {
-      expiresIn:
-        60 * 60
-    }
+      expiresIn: 60 * 60,
+    },
   );
 }
 
@@ -913,16 +555,11 @@ function getVideoSource(input) {
     // YOUTUBE
     // ----------------------------------------------------------
 
-    if (
-      hostname === "youtu.be" ||
-      hostname.includes("youtube.com")
-    ) {
+    if (hostname === "youtu.be" || hostname.includes("youtube.com")) {
       let id = null;
 
       if (hostname === "youtu.be") {
-        id = u.pathname
-          .slice(1)
-          .split("/")[0];
+        id = u.pathname.slice(1).split("/")[0];
       }
 
       if (hostname.includes("youtube.com")) {
@@ -931,13 +568,11 @@ function getVideoSource(input) {
         }
 
         if (u.pathname.startsWith("/shorts/")) {
-          id = u.pathname
-            .split("/")[2];
+          id = u.pathname.split("/")[2];
         }
 
         if (u.pathname.startsWith("/embed/")) {
-          id = u.pathname
-            .split("/")[2];
+          id = u.pathname.split("/")[2];
         }
       }
 
@@ -945,7 +580,7 @@ function getVideoSource(input) {
         return {
           platform: "youtube",
           id,
-          url: `https://www.youtube.com/watch?v=${id}`
+          url: `https://www.youtube.com/watch?v=${id}`,
         };
       }
     }
@@ -954,20 +589,14 @@ function getVideoSource(input) {
     // TIKTOK
     // ----------------------------------------------------------
 
-    if (
-      hostname === "tiktok.com" ||
-      hostname.endsWith(".tiktok.com")
-    ) {
-      const match =
-        u.pathname.match(
-          /\/video\/(\d+)/
-        );
+    if (hostname === "tiktok.com" || hostname.endsWith(".tiktok.com")) {
+      const match = u.pathname.match(/\/video\/(\d+)/);
 
       if (match) {
         return {
           platform: "tiktok",
           id: `tt_${match[1]}`,
-          url: input.trim()
+          url: input.trim(),
         };
       }
 
@@ -980,228 +609,136 @@ function getVideoSource(input) {
           .update(input.trim())
           .digest("hex")
           .slice(0, 16)}`,
-        url: input.trim()
+        url: input.trim(),
       };
     }
-
   } catch {}
 
   return null;
 }
 
-async function command(
-  name,
-  args
-) {
-  return execFileAsync(
-    name,
-    args,
-    {
-      maxBuffer:
-        50 * 1024 * 1024
-    }
-  );
+async function command(name, args) {
+  return execFileAsync(name, args, {
+    maxBuffer: 50 * 1024 * 1024,
+  });
 }
 
 // ============================================================
 // AUDIO ANALYSIS
 // ============================================================
 
-async function getDuration(
-  file
-) {
-  const {
-    stdout
-  } =
-    await command(
-      "ffprobe",
-      [
-        "-v",
-        "error",
+async function getDuration(file) {
+  const { stdout } = await command("ffprobe", [
+    "-v",
+    "error",
 
-        "-show_entries",
-        "format=duration",
+    "-show_entries",
+    "format=duration",
 
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
+    "-of",
+    "default=noprint_wrappers=1:nokey=1",
 
-        file
-      ]
-    );
+    file,
+  ]);
 
-  return Number(
-    stdout.trim()
-  );
+  return Number(stdout.trim());
 }
 
 // ============================================================
 // FIND GOOD SECTIONS
 // ============================================================
 
+async function findGoodSections(file, duration) {
+  console.log("Analyzing audio for good sections...");
 
-async function findGoodSections(
-  file,
-  duration
-) {
-  console.log(
-    "Analyzing audio for good sections..."
-  );
+  const { stdout } = await command("ffmpeg", [
+    "-hide_banner",
+    "-i",
+    file,
+    "-vn",
+    "-ac",
+    "1",
+    "-ar",
+    "8000",
+    "-f",
+    "s16le",
+    "-",
+  ]);
 
-  const {
-    stdout
-  } =
-    await command(
-      "ffmpeg",
-      [
-        "-hide_banner",
-        "-i",
-        file,
-        "-vn",
-        "-ac",
-        "1",
-        "-ar",
-        "8000",
-        "-f",
-        "s16le",
-        "-"
-      ]
-    );
+  const buffer = Buffer.from(stdout, "binary");
 
-  const buffer =
-    Buffer.from(
-      stdout,
-      "binary"
-    );
+  const sampleRate = 8000;
 
-  const sampleRate =
-    8000;
+  const bytesPerSample = 2;
 
-  const bytesPerSample =
-    2;
+  const totalSamples = Math.floor(buffer.length / bytesPerSample);
 
-  const totalSamples =
-    Math.floor(
-      buffer.length /
-        bytesPerSample
-    );
+  const actualDuration = totalSamples / sampleRate;
 
-  const actualDuration =
-    totalSamples /
-    sampleRate;
+  const effectiveDuration = Math.min(duration, actualDuration);
 
-  const effectiveDuration =
-    Math.min(
-      duration,
-      actualDuration
-    );
-
-  const windowDuration =
-    10;
+  const windowDuration = 10;
 
   // WebRTC VAD works with 30 ms frames.
-  const vadFrameDuration =
-    0.03;
+  const vadFrameDuration = 0.03;
 
-  const vadFrameSamples =
-    Math.round(
-      sampleRate *
-        vadFrameDuration
-    );
+  const vadFrameSamples = Math.round(sampleRate * vadFrameDuration);
 
-  const vadFrameBytes =
-    vadFrameSamples *
-    bytesPerSample;
+  const vadFrameBytes = vadFrameSamples * bytesPerSample;
 
-  const VAD =
-    require("node-vad");
+  const VAD = require("node-vad");
 
-  const vad =
-    new VAD(
-      VAD.Mode.VERY_AGGRESSIVE
-    );
+  const vad = new VAD(VAD.Mode.VERY_AGGRESSIVE);
 
   // ------------------------------------------------------------
   // RUN VAD OVER ENTIRE AUDIO
   // ------------------------------------------------------------
 
-  const speechFrames =
-    [];
+  const speechFrames = [];
 
   for (
     let offset = 0;
-    offset + vadFrameBytes <=
-      buffer.length;
+    offset + vadFrameBytes <= buffer.length;
     offset += vadFrameBytes
   ) {
-    const frame =
-      buffer.subarray(
-        offset,
-        offset +
-          vadFrameBytes
-      );
+    const frame = buffer.subarray(offset, offset + vadFrameBytes);
 
-    const result =
-      await vad.processAudio(
-        frame,
-        sampleRate
-      );
+    const result = await vad.processAudio(frame, sampleRate);
 
-    speechFrames.push(
-      result ===
-        VAD.Event.VOICE
-    );
+    speechFrames.push(result === VAD.Event.VOICE);
   }
 
   // ------------------------------------------------------------
   // SHORT VIDEO
   // ------------------------------------------------------------
 
-  if (
-    effectiveDuration <=
-    windowDuration
-  ) {
+  if (effectiveDuration <= windowDuration) {
     const speechRatio =
-      speechFrames.filter(
-        Boolean
-      ).length /
-      Math.max(
-        speechFrames.length,
-        1
-      );
+      speechFrames.filter(Boolean).length / Math.max(speechFrames.length, 1);
 
     return [
       {
         start: 0,
 
-        duration:
-          effectiveDuration,
+        duration: effectiveDuration,
 
         score: 0,
 
-        speechRatio:
-          Number(
-            speechRatio.toFixed(
-              2
-            )
-          )
-      }
+        speechRatio: Number(speechRatio.toFixed(2)),
+      },
     ];
   }
 
-  const sections =
-    [];
+  const sections = [];
 
   // Candidate every 1 second.
-  const step =
-    1;
+  const step = 1;
 
-  const subWindow =
-    0.5;
+  const subWindow = 0.5;
 
   // Only look up to 3 seconds into a candidate
   // for the first speech.
-  const maxInitialSilence =
-    3;
+  const maxInitialSilence = 3;
 
   // ------------------------------------------------------------
   // ANALYZE CANDIDATE WINDOWS
@@ -1209,118 +746,62 @@ async function findGoodSections(
 
   for (
     let originalStart = 0;
-    originalStart +
-      windowDuration <=
-      effectiveDuration;
+    originalStart + windowDuration <= effectiveDuration;
     originalStart += step
   ) {
-    let loudSubWindows =
-      0;
+    let loudSubWindows = 0;
 
-    let totalSubWindows =
-      0;
+    let totalSubWindows = 0;
 
-    let peak =
-      0;
+    let peak = 0;
 
-    let sumSquares =
-      0;
+    let sumSquares = 0;
 
-    let sampleCount =
-      0;
+    let sampleCount = 0;
 
-    let speechSubWindows =
-      0;
+    let speechSubWindows = 0;
 
     // ----------------------------------------------------------
     // VAD FRAMES FOR ORIGINAL 10 SECOND WINDOW
     // ----------------------------------------------------------
 
-    const firstSpeechFrame =
-      Math.floor(
-        (
-          originalStart *
-          sampleRate
-        ) /
-          vadFrameSamples
-      );
+    const firstSpeechFrame = Math.floor(
+      (originalStart * sampleRate) / vadFrameSamples,
+    );
 
-    const lastSpeechFrame =
-      Math.min(
-        speechFrames.length,
-        Math.ceil(
-          (
-            (
-              originalStart +
-              windowDuration
-            ) *
-            sampleRate
-          ) /
-            vadFrameSamples
-        )
-      );
+    const lastSpeechFrame = Math.min(
+      speechFrames.length,
+      Math.ceil(
+        ((originalStart + windowDuration) * sampleRate) / vadFrameSamples,
+      ),
+    );
 
-    const sectionFrameCount =
-      Math.max(
-        0,
-        lastSpeechFrame -
-          firstSpeechFrame
-      );
+    const sectionFrameCount = Math.max(0, lastSpeechFrame - firstSpeechFrame);
 
-    let speechFrameCount =
-      0;
+    let speechFrameCount = 0;
 
-    for (
-      let frame =
-        firstSpeechFrame;
-      frame <
-        lastSpeechFrame;
-      frame++
-    ) {
-      if (
-        speechFrames[frame]
-      ) {
+    for (let frame = firstSpeechFrame; frame < lastSpeechFrame; frame++) {
+      if (speechFrames[frame]) {
         speechFrameCount++;
       }
     }
 
-    const speechRatio =
-      speechFrameCount /
-      Math.max(
-        sectionFrameCount,
-        1
-      );
+    const speechRatio = speechFrameCount / Math.max(sectionFrameCount, 1);
 
     // ----------------------------------------------------------
     // FIND FIRST SPEECH
     // ----------------------------------------------------------
 
-    let firstSpeechTime =
-      null;
+    let firstSpeechTime = null;
 
-    const maxSpeechSearchFrame =
-      Math.min(
-        lastSpeechFrame,
-        firstSpeechFrame +
-          Math.ceil(
-            maxInitialSilence /
-              vadFrameDuration
-          )
-      );
+    const maxSpeechSearchFrame = Math.min(
+      lastSpeechFrame,
+      firstSpeechFrame + Math.ceil(maxInitialSilence / vadFrameDuration),
+    );
 
-    for (
-      let frame =
-        firstSpeechFrame;
-      frame <
-        maxSpeechSearchFrame;
-      frame++
-    ) {
-      if (
-        speechFrames[frame]
-      ) {
-        firstSpeechTime =
-          frame *
-          vadFrameDuration;
+    for (let frame = firstSpeechFrame; frame < maxSpeechSearchFrame; frame++) {
+      if (speechFrames[frame]) {
+        firstSpeechTime = frame * vadFrameDuration;
 
         break;
       }
@@ -1330,30 +811,17 @@ async function findGoodSections(
     // MOVE START DIRECTLY TO FIRST SPEECH
     // ----------------------------------------------------------
 
-    let start =
-      originalStart;
+    let start = originalStart;
 
-    if (
-      firstSpeechTime !==
-      null
-    ) {
-      start =
-        Number(
-          firstSpeechTime.toFixed(
-            2
-          )
-        );
+    if (firstSpeechTime !== null) {
+      start = Number(firstSpeechTime.toFixed(2));
     }
 
     // ----------------------------------------------------------
     // MAKE SURE 10 SECONDS REMAIN
     // ----------------------------------------------------------
 
-    if (
-      start +
-        windowDuration >
-      effectiveDuration
-    ) {
+    if (start + windowDuration > effectiveDuration) {
       continue;
     }
 
@@ -1361,189 +829,92 @@ async function findGoodSections(
     // 0.5 SECOND SUB-WINDOW ANALYSIS
     // ----------------------------------------------------------
 
-    for (
-      let subStart = 0;
-      subStart <
-        windowDuration;
-      subStart +=
-        subWindow
-    ) {
-      const absoluteStart =
-        originalStart +
-        subStart;
+    for (let subStart = 0; subStart < windowDuration; subStart += subWindow) {
+      const absoluteStart = originalStart + subStart;
 
-      const sampleStart =
-        Math.floor(
-          absoluteStart *
-            sampleRate
-        );
+      const sampleStart = Math.floor(absoluteStart * sampleRate);
 
-      const sampleEnd =
-        Math.min(
-          totalSamples,
-          Math.floor(
-            (
-              absoluteStart +
-              subWindow
-            ) *
-              sampleRate
-          )
-        );
+      const sampleEnd = Math.min(
+        totalSamples,
+        Math.floor((absoluteStart + subWindow) * sampleRate),
+      );
 
-      let subSumSquares =
-        0;
+      let subSumSquares = 0;
 
-      let subSamples =
-        0;
+      let subSamples = 0;
 
-      let subPeak =
-        0;
+      let subPeak = 0;
 
       // --------------------------------------------------------
       // LOUDNESS
       // --------------------------------------------------------
 
-      for (
-        let i =
-          sampleStart;
-        i <
-          sampleEnd;
-        i++
-      ) {
-        const offset =
-          i *
-          bytesPerSample;
+      for (let i = sampleStart; i < sampleEnd; i++) {
+        const offset = i * bytesPerSample;
 
-        if (
-          offset + 1 >=
-          buffer.length
-        ) {
+        if (offset + 1 >= buffer.length) {
           break;
         }
 
-        const sample =
-          buffer.readInt16LE(
-            offset
-          );
+        const sample = buffer.readInt16LE(offset);
 
-        const normalized =
-          Math.abs(
-            sample /
-              32768
-          );
+        const normalized = Math.abs(sample / 32768);
 
-        subPeak =
-          Math.max(
-            subPeak,
-            normalized
-          );
+        subPeak = Math.max(subPeak, normalized);
 
-        subSumSquares +=
-          normalized *
-          normalized;
+        subSumSquares += normalized * normalized;
 
         subSamples++;
       }
 
-      if (
-        subSamples === 0
-      ) {
+      if (subSamples === 0) {
         continue;
       }
 
-      const rms =
-        Math.sqrt(
-          subSumSquares /
-            subSamples
-        );
+      const rms = Math.sqrt(subSumSquares / subSamples);
 
-      const db =
-        20 *
-        Math.log10(
-          Math.max(
-            rms,
-            0.00001
-          )
-        );
+      const db = 20 * Math.log10(Math.max(rms, 0.00001));
 
-      if (
-        db > -30 &&
-        subPeak > 0.04
-      ) {
+      if (db > -30 && subPeak > 0.04) {
         loudSubWindows++;
       }
 
       totalSubWindows++;
 
-      sumSquares +=
-        subSumSquares;
+      sumSquares += subSumSquares;
 
-      sampleCount +=
-        subSamples;
+      sampleCount += subSamples;
 
-      peak =
-        Math.max(
-          peak,
-          subPeak
-        );
+      peak = Math.max(peak, subPeak);
 
       // --------------------------------------------------------
       // SPEECH IN SUB-WINDOW
       // --------------------------------------------------------
 
-      const firstFrame =
-        Math.floor(
-          (
-            absoluteStart *
-            sampleRate
-          ) /
-            vadFrameSamples
-        );
+      const firstFrame = Math.floor(
+        (absoluteStart * sampleRate) / vadFrameSamples,
+      );
 
-      const lastFrame =
-        Math.min(
-          speechFrames.length,
-          Math.ceil(
-            (
-              (
-                absoluteStart +
-                subWindow
-              ) *
-              sampleRate
-            ) /
-              vadFrameSamples
-          )
-        );
+      const lastFrame = Math.min(
+        speechFrames.length,
+        Math.ceil(((absoluteStart + subWindow) * sampleRate) / vadFrameSamples),
+      );
 
-      let hasSpeech =
-        false;
+      let hasSpeech = false;
 
-      for (
-        let frame =
-          firstFrame;
-        frame <
-          lastFrame;
-        frame++
-      ) {
-        if (
-          speechFrames[frame]
-        ) {
+      for (let frame = firstFrame; frame < lastFrame; frame++) {
+        if (speechFrames[frame]) {
           hasSpeech = true;
           break;
         }
       }
 
-      if (
-        hasSpeech
-      ) {
+      if (hasSpeech) {
         speechSubWindows++;
       }
     }
 
-    if (
-      totalSubWindows ===
-      0
-    ) {
+    if (totalSubWindows === 0) {
       continue;
     }
 
@@ -1551,142 +922,74 @@ async function findGoodSections(
     // LOUDNESS
     // ----------------------------------------------------------
 
-    const loudRatio =
-      loudSubWindows /
-      totalSubWindows;
+    const loudRatio = loudSubWindows / totalSubWindows;
 
-    const rms =
-      Math.sqrt(
-        sumSquares /
-          Math.max(
-            sampleCount,
-            1
-          )
-      );
+    const rms = Math.sqrt(sumSquares / Math.max(sampleCount, 1));
 
-    const db =
-      20 *
-      Math.log10(
-        Math.max(
-          rms,
-          0.00001
-        )
-      );
+    const db = 20 * Math.log10(Math.max(rms, 0.00001));
 
     // ----------------------------------------------------------
     // SPEECH DISTRIBUTION
     // ----------------------------------------------------------
 
-    const speechSubWindowRatio =
-      speechSubWindows /
-      totalSubWindows;
+    const speechSubWindowRatio = speechSubWindows / totalSubWindows;
 
     // ----------------------------------------------------------
     // SCORE
     // ----------------------------------------------------------
 
-    let score =
-      0;
+    let score = 0;
 
     // Speech ratio
-    if (
-      speechRatio >=
-      0.8
-    ) {
+    if (speechRatio >= 0.8) {
       score += 8;
-    } else if (
-      speechRatio >=
-      0.6
-    ) {
+    } else if (speechRatio >= 0.6) {
       score += 6;
-    } else if (
-      speechRatio >=
-      0.4
-    ) {
+    } else if (speechRatio >= 0.4) {
       score += 4;
-    } else if (
-      speechRatio >=
-      0.2
-    ) {
+    } else if (speechRatio >= 0.2) {
       score += 2;
     }
 
     // Speech spread
-    if (
-      speechSubWindowRatio >=
-      0.8
-    ) {
+    if (speechSubWindowRatio >= 0.8) {
       score += 4;
-    } else if (
-      speechSubWindowRatio >=
-      0.6
-    ) {
+    } else if (speechSubWindowRatio >= 0.6) {
       score += 3;
-    } else if (
-      speechSubWindowRatio >=
-      0.4
-    ) {
+    } else if (speechSubWindowRatio >= 0.4) {
       score += 2;
-    } else if (
-      speechSubWindowRatio >=
-      0.2
-    ) {
+    } else if (speechSubWindowRatio >= 0.2) {
       score += 1;
     }
 
     // Existing loudness scoring
-    if (
-      loudRatio >=
-      0.8
-    ) {
+    if (loudRatio >= 0.8) {
       score += 4;
-    } else if (
-      loudRatio >=
-      0.6
-    ) {
+    } else if (loudRatio >= 0.6) {
       score += 3;
-    } else if (
-      loudRatio >=
-      0.4
-    ) {
+    } else if (loudRatio >= 0.4) {
       score += 2;
-    } else if (
-      loudRatio >=
-      0.25
-    ) {
+    } else if (loudRatio >= 0.25) {
       score += 1;
     }
 
-    if (
-      db > -18
-    ) {
+    if (db > -18) {
       score += 3;
-    } else if (
-      db > -24
-    ) {
+    } else if (db > -24) {
       score += 2;
-    } else if (
-      db > -30
-    ) {
+    } else if (db > -30) {
       score += 1;
     }
 
-    if (
-      peak > 0.5
-    ) {
+    if (peak > 0.5) {
       score += 1;
     }
 
-    if (
-      start > 5
-    ) {
+    if (start > 5) {
       score += 1;
     }
 
-    if (
-      start <
-      effectiveDuration - 15
-    ) {
+    if (start < effectiveDuration - 15) {
       score += 1;
     }
 
@@ -1694,28 +997,15 @@ async function findGoodSections(
     // ACCEPT SECTION
     // ----------------------------------------------------------
 
-    if (
-      speechRatio >= 0.2 ||
-      (
-        loudRatio >= 0.4 &&
-        db > -32
-      )
-    ) {
+    if (speechRatio >= 0.2 || (loudRatio >= 0.4 && db > -32)) {
       sections.push({
-        start:
-          start,
+        start: start,
 
-        duration:
-          windowDuration,
+        duration: windowDuration,
 
         score,
 
-        speechRatio:
-          Number(
-            speechRatio.toFixed(
-              2
-            )
-          )
+        speechRatio: Number(speechRatio.toFixed(2)),
       });
     }
   }
@@ -1724,146 +1014,76 @@ async function findGoodSections(
   // SORT BY SCORE
   // ------------------------------------------------------------
 
-  sections.sort(
-    (a, b) =>
-      b.score -
-      a.score
-  );
+  sections.sort((a, b) => b.score - a.score);
 
   // No spacing restriction.
-  const goodSections =
-    sections.slice(
-      0,
-      20
-    );
+  const goodSections = sections.slice(0, 20);
 
   // ------------------------------------------------------------
   // FALLBACK
   // ------------------------------------------------------------
 
-  if (
-    goodSections.length ===
-    0
-  ) {
-    const maxStart =
-      Math.max(
-        0,
-        effectiveDuration -
-          windowDuration
-      );
+  if (goodSections.length === 0) {
+    const maxStart = Math.max(0, effectiveDuration - windowDuration);
 
-    if (
-      maxStart === 0
-    ) {
+    if (maxStart === 0) {
       const speechRatio =
-        speechFrames.filter(
-          Boolean
-        ).length /
-        Math.max(
-          speechFrames.length,
-          1
-        );
+        speechFrames.filter(Boolean).length / Math.max(speechFrames.length, 1);
 
       return [
         {
           start: 0,
 
-          duration:
-            effectiveDuration,
+          duration: effectiveDuration,
 
           score: 0,
 
-          speechRatio:
-            Number(
-              speechRatio.toFixed(
-                2
-              )
-            )
-        }
+          speechRatio: Number(speechRatio.toFixed(2)),
+        },
       ];
     }
 
-    const fallback =
-      [];
+    const fallback = [];
 
-    for (
-      let i = 0;
-      i < 10;
-      i++
-    ) {
-      const start =
-        Math.random() *
-        maxStart;
+    for (let i = 0; i < 10; i++) {
+      const start = Math.random() * maxStart;
 
       fallback.push({
-        start:
-          Number(
-            start.toFixed(2)
-          ),
+        start: Number(start.toFixed(2)),
 
-        duration:
-          Math.min(
-            windowDuration,
-            effectiveDuration -
-              start
-          ),
+        duration: Math.min(windowDuration, effectiveDuration - start),
 
         score: 0,
 
-        speechRatio: 0
+        speechRatio: 0,
       });
     }
 
     return fallback;
   }
 
-  console.log(
-    `Found ${goodSections.length} good sections.`
-  );
+  console.log(`Found ${goodSections.length} good sections.`);
 
   return goodSections;
 }
 
-function pickRandomSection(
-  sections
-) {
-  if (
-    !Array.isArray(
-      sections
-    ) ||
-    sections.length === 0
-  ) {
+function pickRandomSection(sections) {
+  if (!Array.isArray(sections) || sections.length === 0) {
     return null;
   }
 
-  const top =
-    sections.slice(
-      0,
-      Math.min(
-        sections.length,
-        10
-      )
-    );
+  const top = sections.slice(0, Math.min(sections.length, 10));
 
-  return top[
-    Math.floor(
-      Math.random() *
-        top.length
-    )
-  ];
+  return top[Math.floor(Math.random() * top.length)];
 }
 
 // ============================================================
 // YOUTUBE METADATA
 // ============================================================
 
-async function getVideoMetadata(
-  source
-) {
+async function getVideoMetadata(source) {
   try {
-    const {
-      stdout
-    } = await command(
+    const { stdout } = await command(
       "yt-dlp",
       youtubeArgs([
         "--no-playlist",
@@ -1873,30 +1093,18 @@ async function getVideoMetadata(
 
         "--skip-download",
 
-        source.url
-      ])
+        source.url,
+      ]),
     );
 
-    const [
-      title,
-      channel
-    ] =
-      stdout
-        .trim()
-        .split("\t");
+    const [title, channel] = stdout.trim().split("\t");
 
     return {
       title,
-      channel
+      channel,
     };
-
-  } catch (
-    error
-  ) {
-    console.error(
-      `Could not get metadata for ${source.url}:`,
-      error.message
-    );
+  } catch (error) {
+    console.error(`Could not get metadata for ${source.url}:`, error.message);
 
     return {};
   }
@@ -1923,41 +1131,20 @@ async function getVideoMetadata(
 // use the exact same findGoodSections logic.
 //
 
-async function processVideo(
-  source
-) {
+async function processVideo(source) {
+  const { id, platform, url } = source;
 
-  const {
-    id,
-    platform,
-    url
-  } = source;
+  const outputTemplate = path.join(VIDEOS, `${id}.%(ext)s`);
 
-  const outputTemplate =
-    path.join(
-      VIDEOS,
-      `${id}.%(ext)s`
-    );
+  const wav = path.join(VIDEOS, `${id}.wav`);
 
-  const wav =
-    path.join(
-      VIDEOS,
-      `${id}.wav`
-    );
-
-  const mp3 =
-    path.join(
-      AUDIO,
-      `${id}.mp3`
-    );
+  const mp3 = path.join(AUDIO, `${id}.mp3`);
 
   // ----------------------------------------------------------
   // DOWNLOAD
   // ----------------------------------------------------------
 
-  console.log(
-    `Downloading ${id}...`
-  );
+  console.log(`Downloading ${id}...`);
 
   await command(
     "yt-dlp",
@@ -1978,133 +1165,96 @@ async function processVideo(
       "-o",
       outputTemplate,
 
-      url
-    ])
+      url,
+    ]),
   );
 
-  if (
-    !fs.existsSync(wav)
-  ) {
-    throw new Error(
-      "yt-dlp did not create the expected WAV file."
-    );
+  if (!fs.existsSync(wav)) {
+    throw new Error("yt-dlp did not create the expected WAV file.");
   }
 
   // ----------------------------------------------------------
   // DURATION
   // ----------------------------------------------------------
 
-  const duration =
-    await getDuration(
-      wav
-    );
+  const duration = await getDuration(wav);
 
-  if (
-    !duration ||
-    duration <= 0
-  ) {
-    throw new Error(
-      "Could not determine video duration."
-    );
+  if (!duration || duration <= 0) {
+    throw new Error("Could not determine video duration.");
   }
 
   // ----------------------------------------------------------
   // FIND GOOD SECTIONS
   // ----------------------------------------------------------
 
-  const goodSections =
-    await findGoodSections(
-      wav,
-      duration
-    );
+  const goodSections = await findGoodSections(wav, duration);
 
-  if (
-    !goodSections.length
-  ) {
-    throw new Error(
-      "Could not find any suitable audio sections."
-    );
+  if (!goodSections.length) {
+    throw new Error("Could not find any suitable audio sections.");
   }
 
   // ----------------------------------------------------------
   // CREATE MP3
   // ----------------------------------------------------------
 
-  console.log(
-    `Converting ${id} to MP3...`
-  );
+  console.log(`Converting ${id} to MP3...`);
 
-  await command(
-    "ffmpeg",
-    [
-      "-y",
+  await command("ffmpeg", [
+    "-y",
 
-      "-i",
-      wav,
+    "-i",
+    wav,
 
-      "-vn",
+    "-vn",
 
-      "-ac",
-      "1",
+    "-ac",
+    "1",
 
-      "-ar",
-      "44100",
+    "-ar",
+    "44100",
 
-      "-af",
-      "loudnorm=I=-16:TP=-1.5:LRA=11",
+    "-af",
+    "loudnorm=I=-16:TP=-1.5:LRA=11",
 
-      "-codec:a",
-      "libmp3lame",
+    "-codec:a",
+    "libmp3lame",
 
-      "-b:a",
-      "128k",
+    "-b:a",
+    "128k",
 
-      mp3
-    ]
-  );
+    mp3,
+  ]);
 
-  if (
-    !fs.existsSync(mp3)
-  ) {
-    throw new Error(
-      "ffmpeg did not create the expected MP3 file."
-    );
+  if (!fs.existsSync(mp3)) {
+    throw new Error("ffmpeg did not create the expected MP3 file.");
   }
 
   // ----------------------------------------------------------
   // METADATA
   // ----------------------------------------------------------
 
-  const meta =
-    await getVideoMetadata(
-      source
-    );
+  const meta = await getVideoMetadata(source);
 
   // ----------------------------------------------------------
   // CLEAN WAV
   // ----------------------------------------------------------
 
-  fs.rmSync(
-    wav,
-    {
-      force: true
-    }
-  );
+  fs.rmSync(wav, {
+    force: true,
+  });
 
   return {
     title:
       meta.title ||
       `${platform === "tiktok" ? "TikTok" : "YouTube"} video ${id}`,
 
-    channel:
-      meta.channel || "",
+    channel: meta.channel || "",
 
     duration,
 
     goodSections,
 
-    mp3Path:
-      mp3
+    mp3Path: mp3,
   };
 }
 
@@ -2114,12 +1264,10 @@ async function processVideo(
 
 function getReadyVideos() {
   return readDb().filter(
-    video =>
+    (video) =>
       video.ready === true &&
-      Array.isArray(
-        video.goodSections
-      ) &&
-      video.goodSections.length > 0
+      Array.isArray(video.goodSections) &&
+      video.goodSections.length > 0,
   );
 }
 
@@ -2127,20 +1275,12 @@ function getReadyVideos() {
 // ADMIN AUTH
 // ============================================================
 
-const adminSessions =
-  new Map();
+const adminSessions = new Map();
 
-const ADMIN_SESSION_DURATION =
-  24 *
-  60 *
-  60 *
-  1000;
+const ADMIN_SESSION_DURATION = 24 * 60 * 60 * 1000;
 
-function parseCookies(
-  request
-) {
-  const header =
-    request.headers.cookie;
+function parseCookies(request) {
+  const header = request.headers.cookie;
 
   if (!header) {
     return {};
@@ -2148,56 +1288,32 @@ function parseCookies(
 
   const cookies = {};
 
-  for (
-    const part of
-      header.split(";")
-  ) {
-    const [
-      key,
-      ...rest
-    ] =
-      part
-        .trim()
-        .split("=");
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=");
 
-    cookies[key] =
-      decodeURIComponent(
-        rest.join("=")
-      );
+    cookies[key] = decodeURIComponent(rest.join("="));
   }
 
   return cookies;
 }
 
-function isAdminAuthenticated(
-  req
-) {
-  const cookies =
-    parseCookies(req);
+function isAdminAuthenticated(req) {
+  const cookies = parseCookies(req);
 
-  const token =
-    cookies.admin_session;
+  const token = cookies.admin_session;
 
   if (!token) {
     return false;
   }
 
-  const session =
-    adminSessions.get(
-      token
-    );
+  const session = adminSessions.get(token);
 
   if (!session) {
     return false;
   }
 
-  if (
-    Date.now() >
-    session.expiresAt
-  ) {
-    adminSessions.delete(
-      token
-    );
+  if (Date.now() > session.expiresAt) {
+    adminSessions.delete(token);
 
     return false;
   }
@@ -2205,22 +1321,11 @@ function isAdminAuthenticated(
   return true;
 }
 
-function requireAdmin(
-  req,
-  res,
-  next
-) {
-  if (
-    !isAdminAuthenticated(
-      req
-    )
-  ) {
-    return res
-      .status(401)
-      .json({
-        error:
-          "Unauthorized"
-      });
+function requireAdmin(req, res, next) {
+  if (!isAdminAuthenticated(req)) {
+    return res.status(401).json({
+      error: "Unauthorized",
+    });
   }
 
   next();
@@ -2231,140 +1336,78 @@ function requireAdmin(
 // ============================================================
 
 // POST: perform admin login
-app.post(
-  "/admin-login",
-  (req, res) => {
-    if (!ADMIN_PASSWORD) {
-      return res
-        .status(500)
-        .json({
-          error:
-            "ADMIN_PASSWORD is not configured."
-        });
-    }
-
-    const password =
-      String(
-        req.body?.password ||
-          ""
-      );
-
-    if (
-      password !==
-      ADMIN_PASSWORD
-    ) {
-      return res
-        .status(401)
-        .json({
-          error:
-            "Incorrect password."
-        });
-    }
-
-    const token =
-      crypto
-        .randomBytes(
-          32
-        )
-        .toString("hex");
-
-    adminSessions.set(
-      token,
-      {
-        expiresAt:
-          Date.now() +
-          ADMIN_SESSION_DURATION
-      }
-    );
-
-    res.setHeader(
-      "Set-Cookie",
-      [
-        `admin_session=${encodeURIComponent(
-          token
-        )}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(
-          ADMIN_SESSION_DURATION /
-            1000
-        )}`
-      ]
-    );
-
-    res.json({
-      ok: true
+app.post("/admin-login", (req, res) => {
+  if (!ADMIN_PASSWORD) {
+    return res.status(500).json({
+      error: "ADMIN_PASSWORD is not configured.",
     });
   }
-);
+
+  const password = String(req.body?.password || "");
+
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({
+      error: "Incorrect password.",
+    });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  adminSessions.set(token, {
+    expiresAt: Date.now() + ADMIN_SESSION_DURATION,
+  });
+
+  res.setHeader("Set-Cookie", [
+    `admin_session=${encodeURIComponent(
+      token,
+    )}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${Math.floor(
+      ADMIN_SESSION_DURATION / 1000,
+    )}`,
+  ]);
+
+  res.json({
+    ok: true,
+  });
+});
 // ============================================================
 // ADMIN LOGOUT
 // ============================================================
 
-app.post(
-  "/admin-logout",
-  (req, res) => {
-    const cookies =
-      parseCookies(req);
+app.post("/admin-logout", (req, res) => {
+  const cookies = parseCookies(req);
 
-    const token =
-      cookies.admin_session;
+  const token = cookies.admin_session;
 
-    if (token) {
-      adminSessions.delete(
-        token
-      );
-    }
-
-    res.setHeader(
-      "Set-Cookie",
-      [
-        "admin_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0"
-      ]
-    );
-
-    res.json({
-      ok: true
-    });
+  if (token) {
+    adminSessions.delete(token);
   }
-);
+
+  res.setHeader("Set-Cookie", [
+    "admin_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0",
+  ]);
+
+  res.json({
+    ok: true,
+  });
+});
 
 // ============================================================
 // ADMIN PAGES
 // ============================================================
 
 // GET: show admin page
-app.get(
-  "/admin",
-  (req, res) => {
-    if (
-      !isAdminAuthenticated(
-        req
-      )
-    ) {
-      return res.redirect(
-        "/admin-login"
-      );
-    }
-
-    res.sendFile(
-      path.join(
-        PUBLIC,
-        "index.html"
-      )
-    );
+app.get("/admin", (req, res) => {
+  if (!isAdminAuthenticated(req)) {
+    return res.redirect("/admin-login");
   }
-);
 
-  // GET: show admin login page
-  app.get(
-    "/admin-login",
-    (req, res) => {
-      res.sendFile(
-        path.join(
-          PUBLIC,
-          "index.html"
-        )
-      );
-    }
-  );
+  res.sendFile(path.join(PUBLIC, "index.html"));
+});
+
+// GET: show admin login page
+app.get("/admin-login", (req, res) => {
+  res.sendFile(path.join(PUBLIC, "index.html"));
+});
 // ============================================================
 // GET ONLINE VIDEOS
 // ============================================================
@@ -2376,811 +1419,471 @@ app.get(
 // Local backup videos are NOT returned.
 //
 
-app.get(
-  "/api/videos",
-  requireAdmin,
-  (req, res) => {
-    res.json(
-      readDb().map(
-        video => ({
-          id:
-            video.id,
+app.get("/api/videos", requireAdmin, (req, res) => {
+  res.json(
+    readDb().map((video) => ({
+      id: video.id,
 
-          title:
-            video.title,
+      title: video.title,
 
-          channel:
-            video.channel,
+      channel: video.channel,
 
-          duration:
-            video.duration,
+      duration: video.duration,
 
-          ready:
-            video.ready,
+      ready: video.ready,
 
-          createdAt:
-            video.createdAt
-        })
-      )
-    );
-  }
-);
+      createdAt: video.createdAt,
+    })),
+  );
+});
 
 // ============================================================
 // ADD VIDEO
 // ============================================================
 
-app.post(
-  "/api/videos",
-  requireAdmin,
-  async (
-    req,
-    res
-  ) => {
-    const source =
-        getVideoSource(
-          req.body?.url ||
-            ""
-        );
+app.post("/api/videos", requireAdmin, async (req, res) => {
+  const source = getVideoSource(req.body?.url || "");
 
-      if (!source) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Invalid YouTube or TikTok URL."
-          });
+  if (!source) {
+    return res.status(400).json({
+      error: "Invalid YouTube or TikTok URL.",
+    });
+  }
+
+  const { id, platform } = source;
+
+  // ========================================================
+  // DUPLICATE CHECK
+  // ========================================================
+  //
+  // Always check the ONLINE database.
+  //
+  // In local mode, also check backup/videos.json so
+  // you cannot accidentally process the same unpublished
+  // video twice.
+
+  const alreadyOnline = readDb().some((video) => video.id === id);
+
+  if (alreadyOnline) {
+    return res.status(409).json({
+      error: "This video is already in the online list.",
+    });
+  }
+
+  if (IS_LOCAL && backupVideoExists(id)) {
+    return res.status(409).json({
+      error: "This video is already in the local backup.",
+    });
+  }
+
+  let result = null;
+
+  let localBackupSaved = false;
+
+  try {
+    console.log(`Processing video ${id}...`);
+
+    // ======================================================
+    // PROCESS LOCALLY
+    // ======================================================
+    //
+    // This does:
+    //
+    // YouTube download
+    //      ↓
+    // WAV
+    //      ↓
+    // findGoodSections()
+    //      ↓
+    // normalized MP3
+    //
+    // Nothing is uploaded yet.
+
+    result = await processVideo(source);
+
+    // ======================================================
+    // LOCAL MODE
+    // ======================================================
+
+    if (IS_LOCAL) {
+      const backupMp3 = path.join(BACKUP_AUDIO, `${id}.mp3`);
+
+      // Copy processed MP3 into backup.
+      fs.copyFileSync(result.mp3Path, backupMp3);
+
+      const backupVideo = saveBackupVideo({
+        id,
+
+        title: result.title,
+
+        channel: result.channel,
+
+        duration: result.duration,
+
+        goodSections: result.goodSections,
+
+        ready: true,
+
+        createdAt: new Date().toISOString(),
+
+        audioUrl: getAudioKey(id),
+      });
+
+      localBackupSaved = true;
+
+      // Remove temporary MP3 from data/audio.
+      fs.rmSync(result.mp3Path, {
+        force: true,
+      });
+
+      console.log("");
+
+      console.log(`LOCAL VIDEO READY: ${id}`);
+
+      console.log(`MP3: ${backupMp3}`);
+
+      console.log(`Metadata: ${BACKUP_VIDEOS_JSON}`);
+
+      console.log("NOT uploaded to Supabase.");
+
+      console.log("NOT uploaded to R2.");
+
+      console.log("Run: node backup.js upload");
+
+      console.log("");
+
+      // IMPORTANT:
+      //
+      // Do NOT push to videoDb.
+      //
+      // Therefore the game and admin list do NOT
+      // see this video until backup.js uploads it.
+
+      return res.status(201).json({
+        success: true,
+
+        local: true,
+
+        published: false,
+
+        id: backupVideo.id,
+
+        title: backupVideo.title,
+
+        channel: backupVideo.channel,
+
+        duration: backupVideo.duration,
+
+        goodSections: backupVideo.goodSections,
+
+        message:
+          "Video processed and saved to local backup. Run `node backup.js upload` to publish it.",
+      });
+    }
+
+    // ======================================================
+    // PRODUCTION MODE
+    // ======================================================
+    //
+    // Production keeps the original behavior:
+    //
+    // Supabase placeholder
+    //      ↓
+    // process
+    //      ↓
+    // R2
+    //      ↓
+    // Supabase ready=true
+
+    const item = {
+      id,
+
+      title: "Processing…",
+
+      channel: "",
+
+      duration: 0,
+
+      goodSections: [],
+
+      ready: false,
+
+      createdAt: new Date().toISOString(),
+
+      audioUrl: getAudioKey(id),
+    };
+
+    // Insert placeholder.
+    await insertVideo(item);
+
+    // Upload processed MP3.
+    const audioKey = await uploadAudioToR2(id, result.mp3Path);
+
+    // Remove temporary MP3.
+    fs.rmSync(result.mp3Path, {
+      force: true,
+    });
+
+    const updated = await updateVideo(id, {
+      title: result.title,
+
+      channel: result.channel,
+
+      duration: result.duration,
+
+      goodSections: result.goodSections,
+
+      audioUrl: audioKey,
+
+      ready: true,
+    });
+
+    return res.status(201).json(updated);
+  } catch (error) {
+    console.error(`Processing failed for ${id}:`, error);
+
+    // ======================================================
+    // LOCAL CLEANUP
+    // ======================================================
+
+    if (IS_LOCAL) {
+      if (result?.mp3Path) {
+        fs.rmSync(result.mp3Path, {
+          force: true,
+        });
       }
 
-      const {
-        id,
-        platform
-      } = source;
+      fs.rmSync(path.join(VIDEOS, `${id}.wav`), {
+        force: true,
+      });
 
-    // ========================================================
-    // DUPLICATE CHECK
-    // ========================================================
-    //
-    // Always check the ONLINE database.
-    //
-    // In local mode, also check backup/videos.json so
-    // you cannot accidentally process the same unpublished
-    // video twice.
+      if (localBackupSaved) {
+        try {
+          removeBackupVideo(id);
+        } catch (cleanupError) {
+          console.error("Could not clean up local backup:", cleanupError);
+        }
+      }
 
-    const alreadyOnline =
-      readDb().some(
-        video =>
-          video.id === id
-      );
+      return res.status(500).json({
+        error: `Processing failed: ${error.message}`,
 
-    if (
-      alreadyOnline
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "This video is already in the online list."
-        });
+        hint: "Make sure yt-dlp, ffmpeg and ffprobe are installed and available in PATH.",
+      });
     }
 
-    if (
-      IS_LOCAL &&
-      backupVideoExists(id)
-    ) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "This video is already in the local backup."
-        });
-    }
+    // ======================================================
+    // PRODUCTION CLEANUP
+    // ======================================================
 
-    let result =
-      null;
+    await deleteAudioFromR2(id);
 
-    let localBackupSaved =
-      false;
+    fs.rmSync(path.join(AUDIO, `${id}.mp3`), {
+      force: true,
+    });
+
+    fs.rmSync(path.join(AUDIO, `${id}-clip.mp3`), {
+      force: true,
+    });
+
+    fs.rmSync(path.join(VIDEOS, `${id}.wav`), {
+      force: true,
+    });
+
+    fs.rmSync(path.join(VIDEOS, `${id}.mp3`), {
+      force: true,
+    });
 
     try {
-      console.log(
-        `Processing video ${id}...`
-      );
-
-      // ======================================================
-      // PROCESS LOCALLY
-      // ======================================================
-      //
-      // This does:
-      //
-      // YouTube download
-      //      ↓
-      // WAV
-      //      ↓
-      // findGoodSections()
-      //      ↓
-      // normalized MP3
-      //
-      // Nothing is uploaded yet.
-
-      result =
-        await processVideo(
-          source
-        );
-
-      // ======================================================
-      // LOCAL MODE
-      // ======================================================
-
-      if (IS_LOCAL) {
-        const backupMp3 =
-          path.join(
-            BACKUP_AUDIO,
-            `${id}.mp3`
-          );
-
-        // Copy processed MP3 into backup.
-        fs.copyFileSync(
-          result.mp3Path,
-          backupMp3
-        );
-
-        const backupVideo =
-          saveBackupVideo({
-            id,
-
-            title:
-              result.title,
-
-            channel:
-              result.channel,
-
-            duration:
-              result.duration,
-
-            goodSections:
-              result.goodSections,
-
-            ready:
-              true,
-
-            createdAt:
-              new Date().toISOString(),
-
-            audioUrl:
-              getAudioKey(
-                id
-              )
-          });
-
-        localBackupSaved =
-          true;
-
-        // Remove temporary MP3 from data/audio.
-        fs.rmSync(
-          result.mp3Path,
-          {
-            force: true
-          }
-        );
-
-        console.log(
-          ""
-        );
-
-        console.log(
-          `LOCAL VIDEO READY: ${id}`
-        );
-
-        console.log(
-          `MP3: ${backupMp3}`
-        );
-
-        console.log(
-          `Metadata: ${BACKUP_VIDEOS_JSON}`
-        );
-
-        console.log(
-          "NOT uploaded to Supabase."
-        );
-
-        console.log(
-          "NOT uploaded to R2."
-        );
-
-        console.log(
-          "Run: node backup.js upload"
-        );
-
-        console.log(
-          ""
-        );
-
-        // IMPORTANT:
-        //
-        // Do NOT push to videoDb.
-        //
-        // Therefore the game and admin list do NOT
-        // see this video until backup.js uploads it.
-
-        return res
-          .status(201)
-          .json({
-            success:
-              true,
-
-            local:
-              true,
-
-            published:
-              false,
-
-            id:
-              backupVideo.id,
-
-            title:
-              backupVideo.title,
-
-            channel:
-              backupVideo.channel,
-
-            duration:
-              backupVideo.duration,
-
-            goodSections:
-              backupVideo.goodSections,
-
-            message:
-              "Video processed and saved to local backup. Run `node backup.js upload` to publish it."
-          });
-      }
-
-      // ======================================================
-      // PRODUCTION MODE
-      // ======================================================
-      //
-      // Production keeps the original behavior:
-      //
-      // Supabase placeholder
-      //      ↓
-      // process
-      //      ↓
-      // R2
-      //      ↓
-      // Supabase ready=true
-
-      const item = {
-        id,
-
-        title:
-          "Processing…",
-
-        channel:
-          "",
-
-        duration:
-          0,
-
-        goodSections:
-          [],
-
-        ready:
-          false,
-
-        createdAt:
-          new Date().toISOString(),
-
-        audioUrl:
-          getAudioKey(
-            id
-          )
-      };
-
-      // Insert placeholder.
-      await insertVideo(
-        item
-      );
-
-      // Upload processed MP3.
-      const audioKey =
-        await uploadAudioToR2(
-          id,
-          result.mp3Path
-        );
-
-      // Remove temporary MP3.
-      fs.rmSync(
-        result.mp3Path,
-        {
-          force: true
-        }
-      );
-
-      const updated =
-        await updateVideo(
-          id,
-          {
-            title:
-              result.title,
-
-            channel:
-              result.channel,
-
-            duration:
-              result.duration,
-
-            goodSections:
-              result.goodSections,
-
-            audioUrl:
-              audioKey,
-
-            ready:
-              true
-          }
-        );
-
-      return res
-        .status(201)
-        .json(
-          updated
-        );
-    } catch (
-      error
-    ) {
+      await deleteVideoFromDb(id);
+    } catch (cleanupError) {
       console.error(
-        `Processing failed for ${id}:`,
-        error
+        "Could not remove failed video from Supabase:",
+        cleanupError,
       );
-
-      // ======================================================
-      // LOCAL CLEANUP
-      // ======================================================
-
-      if (
-        IS_LOCAL
-      ) {
-        if (
-          result?.mp3Path
-        ) {
-          fs.rmSync(
-            result.mp3Path,
-            {
-              force: true
-            }
-          );
-        }
-
-        fs.rmSync(
-          path.join(
-            VIDEOS,
-            `${id}.wav`
-          ),
-          {
-            force: true
-          }
-        );
-
-        if (
-          localBackupSaved
-        ) {
-          try {
-            removeBackupVideo(
-              id
-            );
-          } catch (
-            cleanupError
-          ) {
-            console.error(
-              "Could not clean up local backup:",
-              cleanupError
-            );
-          }
-        }
-
-        return res
-          .status(500)
-          .json({
-            error:
-              `Processing failed: ${error.message}`,
-
-            hint:
-              "Make sure yt-dlp, ffmpeg and ffprobe are installed and available in PATH."
-          });
-      }
-
-      // ======================================================
-      // PRODUCTION CLEANUP
-      // ======================================================
-
-      await deleteAudioFromR2(
-        id
-      );
-
-      fs.rmSync(
-        path.join(
-          AUDIO,
-          `${id}.mp3`
-        ),
-        {
-          force: true
-        }
-      );
-
-      fs.rmSync(
-        path.join(
-          AUDIO,
-          `${id}-clip.mp3`
-        ),
-        {
-          force: true
-        }
-      );
-
-      fs.rmSync(
-        path.join(
-          VIDEOS,
-          `${id}.wav`
-        ),
-        {
-          force: true
-        }
-      );
-
-      fs.rmSync(
-        path.join(
-          VIDEOS,
-          `${id}.mp3`
-        ),
-        {
-          force: true
-        }
-      );
-
-      try {
-        await deleteVideoFromDb(
-          id
-        );
-      } catch (
-        cleanupError
-      ) {
-        console.error(
-          "Could not remove failed video from Supabase:",
-          cleanupError
-        );
-      }
-
-      return res
-        .status(500)
-        .json({
-          error:
-            `Processing failed: ${error.message}`,
-
-          hint:
-            "Make sure yt-dlp, ffmpeg and ffprobe are installed and available in PATH."
-        });
     }
+
+    return res.status(500).json({
+      error: `Processing failed: ${error.message}`,
+
+      hint: "Make sure yt-dlp, ffmpeg and ffprobe are installed and available in PATH.",
+    });
   }
-);
+});
 
 // ============================================================
 // DELETE VIDEO
 // ============================================================
 
-app.delete(
-  "/api/videos/:id",
-  requireAdmin,
-  async (
-    req,
-    res
-  ) => {
-    const id =
-      req.params.id;
+app.delete("/api/videos/:id", requireAdmin, async (req, res) => {
+  const id = req.params.id;
 
-    try {
-      // ------------------------------------------------------
-      // LOCAL MODE
-      // ------------------------------------------------------
-      //
-      // Never delete online Supabase/R2 data from local mode.
-      //
-      // If a staged backup video exists, it can be removed
-      // from the local backup.
+  try {
+    // ------------------------------------------------------
+    // LOCAL MODE
+    // ------------------------------------------------------
+    //
+    // Never delete online Supabase/R2 data from local mode.
+    //
+    // If a staged backup video exists, it can be removed
+    // from the local backup.
 
-      if (IS_LOCAL) {
-        if (
-          backupVideoExists(
-            id
-          )
-        ) {
-          removeBackupVideo(
-            id
-          );
+    if (IS_LOCAL) {
+      if (backupVideoExists(id)) {
+        removeBackupVideo(id);
 
-          return res.json({
-            ok:
-              true,
+        return res.json({
+          ok: true,
 
-            local:
-              true
-          });
-        }
-
-        return res
-          .status(403)
-          .json({
-            error:
-              "Local mode cannot delete published online videos."
-          });
-      }
-
-      // ------------------------------------------------------
-      // PRODUCTION MODE
-      // ------------------------------------------------------
-
-      await deleteAudioFromR2(
-        id
-      );
-
-      await deleteVideoFromDb(
-        id
-      );
-
-      for (
-        const filename of [
-          `${id}.mp3`,
-          `${id}-clip.mp3`
-        ]
-      ) {
-        fs.rmSync(
-          path.join(
-            AUDIO,
-            filename
-          ),
-          {
-            force: true
-          }
-        );
-      }
-
-      fs.rmSync(
-        path.join(
-          VIDEOS,
-          `${id}.wav`
-        ),
-        {
-          force: true
-        }
-      );
-
-      res.json({
-        ok:
-          true
-      });
-    } catch (
-      error
-    ) {
-      console.error(
-        `Could not delete ${id}:`,
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          error:
-            error.message
+          local: true,
         });
+      }
+
+      return res.status(403).json({
+        error: "Local mode cannot delete published online videos.",
+      });
     }
+
+    // ------------------------------------------------------
+    // PRODUCTION MODE
+    // ------------------------------------------------------
+
+    await deleteAudioFromR2(id);
+
+    await deleteVideoFromDb(id);
+
+    for (const filename of [`${id}.mp3`, `${id}-clip.mp3`]) {
+      fs.rmSync(path.join(AUDIO, filename), {
+        force: true,
+      });
+    }
+
+    fs.rmSync(path.join(VIDEOS, `${id}.wav`), {
+      force: true,
+    });
+
+    res.json({
+      ok: true,
+    });
+  } catch (error) {
+    console.error(`Could not delete ${id}:`, error);
+
+    res.status(500).json({
+      error: error.message,
+    });
   }
-);
+});
 
 // ============================================================
 // SINGLE PLAYER GAME
 // ============================================================
 
-app.get(
-  "/api/game",
-  async (
-    req,
-    res
-  ) => {
-    try {
-      const ready =
-        getReadyVideos();
+app.get("/api/game", async (req, res) => {
+  try {
+    const ready = getReadyVideos();
 
-      if (
-        ready.length < 1
-      ) {
-        return res
-          .status(400)
-          .json({
-            error:
-              "Add at least one ready video first."
-          });
-      }
-
-      const answer =
-        ready[
-          Math.floor(
-            Math.random() *
-              ready.length
-          )
-        ];
-
-      const choices =
-        ready
-          .map(
-            video => ({
-              id:
-                video.id,
-
-              title:
-                video.title
-            })
-          )
-          .sort(
-            () =>
-              Math.random() -
-              0.5
-          );
-
-      // Pick one of the analyzed,
-      // speech-friendly sections.
-      const section =
-        pickRandomSection(
-          answer.goodSections
-        );
-
-      const audioUrl =
-        await getAudioUrl(
-          answer.id
-        );
-
-      res.json({
-        roundId:
-          crypto.randomUUID(),
-
-        answerId:
-          answer.id,
-
-        audioUrl,
-
-        // IMPORTANT:
-        // Start playback at the speech-aligned
-        // start returned by findGoodSections().
-        startTime:
-          section?.start || 0,
-
-        // This is the maximum reveal duration.
-        // Normally this will be 10 seconds.
-        duration:
-          section?.duration ||
-          Math.min(
-            answer.duration,
-            10
-          ),
-
-        choices
+    if (ready.length < 1) {
+      return res.status(400).json({
+        error: "Add at least one ready video first.",
       });
-    } catch (
-      error
-    ) {
-      console.error(
-        "Could not create game:",
-        error
-      );
-
-      res
-        .status(500)
-        .json({
-          error:
-            "Could not create game."
-        });
     }
+
+    const answer = ready[Math.floor(Math.random() * ready.length)];
+
+    const choices = ready
+      .map((video) => ({
+        id: video.id,
+
+        title: video.title,
+      }))
+      .sort(() => Math.random() - 0.5);
+
+    // Pick one of the analyzed,
+    // speech-friendly sections.
+    const section = pickRandomSection(answer.goodSections);
+
+    const audioUrl = await getAudioUrl(answer.id);
+
+    res.json({
+      roundId: crypto.randomUUID(),
+
+      answerId: answer.id,
+
+      audioUrl,
+
+      // IMPORTANT:
+      // Start playback at the speech-aligned
+      // start returned by findGoodSections().
+      startTime: section?.start || 0,
+
+      // This is the maximum reveal duration.
+      // Normally this will be 10 seconds.
+      duration: section?.duration || Math.min(answer.duration, 10),
+
+      choices,
+    });
+  } catch (error) {
+    console.error("Could not create game:", error);
+
+    res.status(500).json({
+      error: "Could not create game.",
+    });
   }
-);
+});
 
 // ============================================================
 // MULTIPLAYER
 // ============================================================
 
-const parties =
-  new Map();
+const parties = new Map();
 
-const ROUND_OPTIONS = [
-  5,
-  10,
-  15,
-  20
-];
+const ROUND_OPTIONS = [5, 10, 15, 20];
 
-const ROUND_DURATION =
-  15 * 1000;
+const ROUND_DURATION = 15 * 1000;
 
 // ============================================================
 // PARTY HELPERS
 // ============================================================
 
 function generatePartyCode() {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
   let code = "";
 
   do {
     code = "";
 
-    for (
-      let i = 0;
-      i < 6;
-      i++
-    ) {
-      code +=
-        chars[
-          Math.floor(
-            Math.random() *
-              chars.length
-          )
-        ];
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
     }
-  } while (
-    parties.has(
-      code
-    )
-  );
+  } while (parties.has(code));
 
   return code;
 }
 
-function getPartyCode(
-  data
-) {
-  return String(
-    data?.code ||
-      data?.partyCode ||
-      ""
-  )
+function getPartyCode(data) {
+  return String(data?.code || data?.partyCode || "")
     .trim()
     .toUpperCase();
 }
 
-function sanitizeName(
-  name
-) {
-  const value =
-    String(
-      name || ""
-    )
-      .trim()
-      .slice(
-        0,
-        30
-      );
+function sanitizeName(name) {
+  const value = String(name || "")
+    .trim()
+    .slice(0, 30);
 
-  return (
-    value ||
-    "Player"
-  );
+  return value || "Player";
 }
 
-function serializePlayer(
-  player
-) {
+function serializePlayer(player) {
   return {
-    id:
-      player.id,
+    id: player.id,
 
-    name:
-      player.name,
+    name: player.name,
 
-    score:
-      player.score || 0,
+    score: player.score || 0,
 
-    answered:
-      Boolean(
-        player.answered
-      )
+    answered: Boolean(player.answered),
   };
 }
 
@@ -3193,154 +1896,80 @@ function serializeParty(party) {
     started: party.started,
     finished: party.finished,
 
-    players: Array.from(
-      party.players.values()
-    ).map(serializePlayer)
+    players: Array.from(party.players.values()).map(serializePlayer),
   };
 }
 
-function emitPartyUpdate(
-  party
-) {
-  io.to(
-    party.code
-  ).emit(
-    "partyUpdated",
-    {
-      party:
-        serializeParty(
-          party
-        )
-    }
-  );
+function emitPartyUpdate(party) {
+  io.to(party.code).emit("partyUpdated", {
+    party: serializeParty(party),
+  });
 }
 
-function getPartyPlayer(
-  party,
-  socketId
-) {
-  return party.players.get(
-    socketId
-  );
+function getPartyPlayer(party, socketId) {
+  return party.players.get(socketId);
 }
 
 // ============================================================
 // CREATE MULTIPLAYER ROUND
 // ============================================================
 
-async function createMultiplayerRound(
-  party
-) {
-  const ready =
-    getReadyVideos();
+async function createMultiplayerRound(party) {
+  const ready = getReadyVideos();
 
-  if (
-    ready.length < 1
-  ) {
-    throw new Error(
-      "There are no ready videos available."
-    );
+  if (ready.length < 1) {
+    throw new Error("There are no ready videos available.");
   }
 
-  let availableVideos =
-    ready.filter(
-      video =>
-        !party.usedVideoIds.has(
-          video.id
-        )
-    );
+  let availableVideos = ready.filter(
+    (video) => !party.usedVideoIds.has(video.id),
+  );
 
-    // If every video has already been used,
-    // start allowing videos again.
-    if (
-      availableVideos.length === 0
-    ) {
-      party.usedVideoIds.clear();
-      availableVideos = ready;
-    }
+  // If every video has already been used,
+  // start allowing videos again.
+  if (availableVideos.length === 0) {
+    party.usedVideoIds.clear();
+    availableVideos = ready;
+  }
 
-    const answer =
-      availableVideos[
-        Math.floor(
-          Math.random() *
-            availableVideos.length
-        )
-      ];
+  const answer =
+    availableVideos[Math.floor(Math.random() * availableVideos.length)];
 
-    party.usedVideoIds.add(
-      answer.id
-    );
+  party.usedVideoIds.add(answer.id);
 
-  const otherChoices =
-    ready
-      .filter(
-        video =>
-          video.id !==
-          answer.id
-      )
-      .sort(
-        () =>
-          Math.random() -
-          0.5
-      )
-      .slice(
-        0,
-        5
-      );
+  const otherChoices = ready
+    .filter((video) => video.id !== answer.id)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 5);
 
-  const choices =
-    [
-      answer,
-      ...otherChoices
-    ]
-      .map(
-        video => ({
-          id:
-            video.id,
+  const choices = [answer, ...otherChoices]
+    .map((video) => ({
+      id: video.id,
 
-          title:
-            video.title
-        })
-      )
-      .sort(
-        () =>
-          Math.random() -
-          0.5
-      );
+      title: video.title,
+    }))
+    .sort(() => Math.random() - 0.5);
 
-  const section =
-    pickRandomSection(
-      answer.goodSections
-    );
+  const section = pickRandomSection(answer.goodSections);
 
-  const audioUrl =
-    await getAudioUrl(
-      answer.id
-    );
+  const audioUrl = await getAudioUrl(answer.id);
 
-  const roundId =
-    crypto.randomUUID();
+  const roundId = crypto.randomUUID();
 
   const round = {
-    roundNumber:
-      party.roundNumber,
+    roundNumber: party.roundNumber,
 
-    totalRounds:
-      party.totalRounds,
+    totalRounds: party.totalRounds,
 
-    answerId:
-      answer.id,
+    answerId: answer.id,
 
     audioUrl,
 
-    startTime:
-      section?.start || 0,
+    startTime: section?.start || 0,
 
-    audioDuration:
-      section?.duration ||
-      10,
+    audioDuration: section?.duration || 10,
 
-    choices
+    choices,
   };
 
   return round;
@@ -3350,95 +1979,47 @@ async function createMultiplayerRound(
 // START NEXT ROUND
 // ============================================================
 
-async function startNextRound(
-  party
-) {
-  if (
-    !party.started ||
-    party.finished
-  ) {
+async function startNextRound(party) {
+  if (!party.started || party.finished) {
     return;
   }
 
-  if (
-    party.roundNumber >
-    party.totalRounds
-  ) {
-    finishPartyGame(
-      party
-    );
+  if (party.roundNumber > party.totalRounds) {
+    finishPartyGame(party);
 
     return;
   }
 
   try {
-    const round =
-      await createMultiplayerRound(
-        party
-      );
+    const round = await createMultiplayerRound(party);
 
-    party.currentRound =
-      round;
+    party.currentRound = round;
 
-    party.roundStartedAt =
-      Date.now();
+    party.roundStartedAt = Date.now();
 
-    party.roundEndsAt =
-      Date.now() +
-      ROUND_DURATION;
+    party.roundEndsAt = Date.now() + ROUND_DURATION;
 
-    for (
-      const player of
-        party.players.values()
-    ) {
-      player.answered =
-        false;
+    for (const player of party.players.values()) {
+      player.answered = false;
 
-      player.currentRoundPoints =
-        0;
+      player.currentRoundPoints = 0;
     }
 
-    io.to(
-      party.code
-    ).emit(
-      "roundStarted",
-      round
-    );
+    io.to(party.code).emit("roundStarted", round);
 
-    if (
-      party.roundTimer
-    ) {
-      clearTimeout(
-        party.roundTimer
-      );
+    if (party.roundTimer) {
+      clearTimeout(party.roundTimer);
     }
 
-    party.roundTimer =
-      setTimeout(
-        () => {
-          finishCurrentRound(
-            party
-          );
-        },
-        ROUND_DURATION
-      );
-  } catch (
-    error
-  ) {
-    console.error(
-      "Could not start multiplayer round:",
-      error
-    );
+    party.roundTimer = setTimeout(() => {
+      finishCurrentRound(party);
+    }, ROUND_DURATION);
+  } catch (error) {
+    console.error("Could not start multiplayer round:", error);
 
-    io.to(
-      party.code
-    ).emit(
-      "partyError",
-      {
-        message:
-          "Could not start the round."
-      }
-    );
+    io.to(party.code).emit("partyError", {
+      message: "Could not start the round.",
+    });
   }
 }
 
@@ -3446,1055 +2027,572 @@ async function startNextRound(
 // FINISH CURRENT ROUND
 // ============================================================
 
-function finishCurrentRound(
-  party
-) {
-  if (
-    !party.currentRound
-  ) {
+function finishCurrentRound(party) {
+  if (!party.currentRound) {
     return;
   }
 
-  if (
-    party.roundFinished
-  ) {
+  if (party.roundFinished) {
     return;
   }
 
-  party.roundFinished =
-    true;
+  party.roundFinished = true;
 
-  if (
-    party.roundTimer
-  ) {
-    clearTimeout(
-      party.roundTimer
-    );
+  if (party.roundTimer) {
+    clearTimeout(party.roundTimer);
 
-    party.roundTimer =
-      null;
+    party.roundTimer = null;
   }
 
-  const results =
-    Array.from(
-      party.players.values()
-    )
-      .map(
-        player => ({
-          id:
-            player.id,
+  const results = Array.from(party.players.values())
+    .map((player) => ({
+      id: player.id,
 
-          name:
-            player.name,
+      name: player.name,
 
-          score:
-            player.score || 0,
+      score: player.score || 0,
 
-          points:
-            player.currentRoundPoints ||
-            0,
+      points: player.currentRoundPoints || 0,
 
-          answered:
-            Boolean(
-              player.answered
-            )
-        })
-      )
-      .sort(
-        (a, b) =>
-          b.points -
-          a.points
-      );
+      answered: Boolean(player.answered),
+    }))
+    .sort((a, b) => b.points - a.points);
 
-  const answer =
-    getReadyVideos().find(
-      video =>
-        video.id ===
-        party.currentRound
-          .answerId
-    );
-
-  io.to(
-    party.code
-  ).emit(
-    "roundFinished",
-    {
-      roundNumber:
-        party.roundNumber,
-
-      totalRounds:
-        party.totalRounds,
-
-      answerId:
-        party.currentRound
-          .answerId,
-
-      answerTitle:
-        answer?.title ||
-        "Unknown",
-
-      results,
-
-      players:
-        Array.from(
-          party.players.values()
-        ).map(
-          serializePlayer
-        )
-    }
+  const answer = getReadyVideos().find(
+    (video) => video.id === party.currentRound.answerId,
   );
 
-  party.currentRound =
-    null;
+  io.to(party.code).emit("roundFinished", {
+    roundNumber: party.roundNumber,
 
-  party.roundFinished =
-    false;
+    totalRounds: party.totalRounds,
+
+    answerId: party.currentRound.answerId,
+
+    answerTitle: answer?.title || "Unknown",
+
+    results,
+
+    players: Array.from(party.players.values()).map(serializePlayer),
+  });
+
+  party.currentRound = null;
+
+  party.roundFinished = false;
 
   party.roundNumber++;
 
-  if (
-    party.roundNumber >
-    party.totalRounds
-  ) {
-    setTimeout(
-      () => {
-        finishPartyGame(
-          party
-        );
-      },
-      1000
-    );
+  if (party.roundNumber > party.totalRounds) {
+    setTimeout(() => {
+      finishPartyGame(party);
+    }, 1000);
 
     return;
   }
 
-  setTimeout(
-    () => {
-      if (
-        party.started &&
-        !party.finished
-      ) {
-        startNextRound(
-          party
-        );
-      }
-    },
-    2500
-  );
+  setTimeout(() => {
+    if (party.started && !party.finished) {
+      startNextRound(party);
+    }
+  }, 2500);
 }
 
 // ============================================================
 // FINISH PARTY GAME
 // ============================================================
 
-function finishPartyGame(
-  party
-) {
-  if (
-    party.finished
-  ) {
+function finishPartyGame(party) {
+  if (party.finished) {
     return;
   }
 
-  party.finished =
-    true;
+  party.finished = true;
 
-  party.started =
-    false;
+  party.started = false;
 
-  if (
-    party.roundTimer
-  ) {
-    clearTimeout(
-      party.roundTimer
-    );
+  if (party.roundTimer) {
+    clearTimeout(party.roundTimer);
 
-    party.roundTimer =
-      null;
+    party.roundTimer = null;
   }
 
-  const players =
-    Array.from(
-      party.players.values()
-    )
-      .map(
-        serializePlayer
-      )
-      .sort(
-        (a, b) =>
-          b.score -
-          a.score
-      );
+  const players = Array.from(party.players.values())
+    .map(serializePlayer)
+    .sort((a, b) => b.score - a.score);
 
-  io.to(
-    party.code
-  ).emit(
-    "gameFinished",
-    {
-      players,
+  io.to(party.code).emit("gameFinished", {
+    players,
 
-      scoreboard:
-        players,
+    scoreboard: players,
 
-      results:
-        players
-    }
-  );
+    results: players,
+  });
 }
 
 // ============================================================
 // SOCKET CONNECTION
 // ============================================================
 
-io.on(
-  "connection",
-  socket => {
-    console.log(
-      `Socket connected: ${socket.id}`
-    );
+io.on("connection", (socket) => {
+  console.log(`Socket connected: ${socket.id}`);
 
-    // --------------------------------------------------------
-    // CREATE PARTY
-    // --------------------------------------------------------
+  // --------------------------------------------------------
+  // CREATE PARTY
+  // --------------------------------------------------------
 
-    socket.on(
-      "createParty",
-      data => {
-        try {
-          const name =
-            sanitizeName(
-              data?.name
-            );
+  socket.on("createParty", (data) => {
+    try {
+      const name = sanitizeName(data?.name);
 
-          let rounds =
-            Number(
-              data?.rounds ??
-                data?.totalRounds
-            ) || 10;
+      let rounds = Number(data?.rounds ?? data?.totalRounds) || 10;
 
-          if (
-            !ROUND_OPTIONS.includes(
-              rounds
-            )
-          ) {
-            rounds = 10;
-          }
-
-          const code =
-            generatePartyCode();
-
-          const party = {
-            code,
-
-            hostId:
-              socket.id,
-
-            totalRounds:
-              rounds,
-
-            roundNumber:
-              1,
-
-            started:
-              false,
-
-            finished:
-              false,
-
-            players:
-              new Map(),
-
-            currentRound:
-              null,
-
-            roundTimer:
-              null,
-
-            roundStartedAt:
-              null,
-
-            roundEndsAt:
-              null,
-
-            roundFinished:
-              false,
-
-            usedVideoIds: new Set(),
-          };
-
-          party.players.set(
-            socket.id,
-            {
-              id:
-                socket.id,
-
-              name,
-
-              score:
-                0,
-
-              answered:
-                false,
-
-              currentRoundPoints:
-                0
-            }
-          );
-
-          parties.set(
-            code,
-            party
-          );
-
-          socket.join(
-            code
-          );
-
-          socket.data.partyCode =
-            code;
-
-          socket.emit(
-            "partyCreated",
-            {
-              party:
-                serializeParty(
-                  party
-                )
-            }
-          );
-
-          console.log(
-            `Party created: ${code}`
-          );
-        } catch (
-          error
-        ) {
-          console.error(
-            error
-          );
-
-          socket.emit(
-            "partyError",
-            {
-              message:
-                "Could not create party."
-            }
-          );
-        }
+      if (!ROUND_OPTIONS.includes(rounds)) {
+        rounds = 10;
       }
-    );
 
-    // --------------------------------------------------------
-    // JOIN PARTY
-    // --------------------------------------------------------
+      const code = generatePartyCode();
 
-    socket.on(
-      "joinParty",
-      data => {
-        try {
-          const code =
-            getPartyCode(
-              data
-            );
+      const party = {
+        code,
 
-          const name =
-            sanitizeName(
-              data?.name
-            );
+        hostId: socket.id,
 
-          if (!code) {
-            return socket.emit(
-              "partyError",
-              {
-                message:
-                  "Please enter a party code."
-              }
-            );
-          }
+        totalRounds: rounds,
 
-          const party =
-            parties.get(
-              code
-            );
+        roundNumber: 1,
 
-          if (!party) {
-            return socket.emit(
-              "partyError",
-              {
-                message:
-                  "Party not found."
-              }
-            );
-          }
+        started: false,
 
-          if (
-            party.started
-          ) {
-            return socket.emit(
-              "partyError",
-              {
-                message:
-                  "This game has already started."
-              }
-            );
-          }
+        finished: false,
 
-          if (
-            party.players.size >=
-            20
-          ) {
-            return socket.emit(
-              "partyError",
-              {
-                message:
-                  "This party is full."
-              }
-            );
-          }
+        players: new Map(),
 
-          party.players.set(
-            socket.id,
-            {
-              id:
-                socket.id,
+        currentRound: null,
 
-              name,
+        roundTimer: null,
 
-              score:
-                0,
+        roundStartedAt: null,
 
-              answered:
-                false,
+        roundEndsAt: null,
 
-              currentRoundPoints:
-                0
-            }
-          );
+        roundFinished: false,
 
-          socket.join(
-            code
-          );
+        usedVideoIds: new Set(),
+      };
 
-          socket.data.partyCode =
-            code;
+      party.players.set(socket.id, {
+        id: socket.id,
 
-          socket.emit(
-            "partyJoined",
-            {
-              party:
-                serializeParty(
-                  party
-                )
-            }
-          );
+        name,
 
-          emitPartyUpdate(
-            party
-          );
+        score: 0,
 
-          console.log(
-            `${name} joined party ${code}`
-          );
-        } catch (
-          error
-        ) {
-          console.error(
-            error
-          );
+        answered: false,
 
-          socket.emit(
-            "partyError",
-            {
-              message:
-                "Could not join party."
-            }
-          );
-        }
+        currentRoundPoints: 0,
+      });
+
+      parties.set(code, party);
+
+      socket.join(code);
+
+      socket.data.partyCode = code;
+
+      socket.emit("partyCreated", {
+        party: serializeParty(party),
+      });
+
+      console.log(`Party created: ${code}`);
+    } catch (error) {
+      console.error(error);
+
+      socket.emit("partyError", {
+        message: "Could not create party.",
+      });
+    }
+  });
+
+  // --------------------------------------------------------
+  // JOIN PARTY
+  // --------------------------------------------------------
+
+  socket.on("joinParty", (data) => {
+    try {
+      const code = getPartyCode(data);
+
+      const name = sanitizeName(data?.name);
+
+      if (!code) {
+        return socket.emit("partyError", {
+          message: "Please enter a party code.",
+        });
       }
-    );
 
-    // --------------------------------------------------------
-    // START PARTY
-    // --------------------------------------------------------
+      const party = parties.get(code);
 
-    socket.on(
-      "startParty",
-      async data => {
-        const code =
-          getPartyCode(
-            data
-          );
-
-        const party =
-          parties.get(
-            code
-          );
-
-        if (!party) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "Party not found."
-            }
-          );
-        }
-
-        if (
-          party.hostId !==
-          socket.id
-        ) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "Only the host can start the game."
-            }
-          );
-        }
-
-        if (
-          party.started
-        ) {
-          return;
-        }
-
-        if (
-          party.players.size <
-          1
-        ) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "At least one player is required."
-            }
-          );
-        }
-
-        const ready =
-          getReadyVideos();
-
-        if (
-          ready.length < 1
-        ) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "There are no ready videos available."
-            }
-          );
-        }
-
-        party.started =
-          true;
-
-        party.finished =
-          false;
-
-        party.roundNumber =
-          1;
-
-        for (
-          const player of
-            party.players.values()
-        ) {
-          player.score =
-            0;
-
-          player.answered =
-            false;
-
-          player.currentRoundPoints =
-            0;
-        }
-
-        emitPartyUpdate(
-          party
-        );
-
-        await startNextRound(
-          party
-        );
+      if (!party) {
+        return socket.emit("partyError", {
+          message: "Party not found.",
+        });
       }
-    );
 
-    // --------------------------------------------------------
-    // NEW GAME
-    // --------------------------------------------------------
-
-    socket.on(
-      "newGame",
-      async data => {
-        const code =
-          getPartyCode(data);
-
-        const party =
-          parties.get(code);
-
-        if (!party) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "Party not found."
-            }
-          );
-        }
-
-        if (
-          party.hostId !==
-          socket.id
-        ) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "Only the host can start a new game."
-            }
-          );
-        }
-
-        if (
-          party.started
-        ) {
-          return;
-        }
-
-        const ready =
-          getReadyVideos();
-
-        if (
-          ready.length < 1
-        ) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "There are no ready videos available."
-            }
-          );
-        }
-
-        // ------------------------------------------------------
-        // RESET GAME
-        // ------------------------------------------------------
-
-        party.started =
-          true;
-
-        party.finished =
-          false;
-
-        party.roundNumber =
-          1;
-
-        party.currentRound =
-          null;
-
-        party.roundFinished =
-          false;
-
-        party.roundStartedAt =
-          null;
-
-        party.roundEndsAt =
-          null;
-
-        party.usedVideoIds =
-          new Set();
-
-        if (
-          party.roundTimer
-        ) {
-          clearTimeout(
-            party.roundTimer
-          );
-
-          party.roundTimer =
-            null;
-        }
-
-        // Reset all player scores
-        // but keep the players in the party.
-        for (
-          const player of
-            party.players.values()
-        ) {
-          player.score =
-            0;
-
-          player.answered =
-            false;
-
-          player.currentRoundPoints =
-            0;
-        }
-
-        // Tell all players that the new game has started.
-        io.to(
-          party.code
-        ).emit(
-          "newGameStarted",
-          {
-            party:
-              serializeParty(
-                party
-              )
-          }
-        );
-
-        emitPartyUpdate(
-          party
-        );
-
-        await startNextRound(
-          party
-        );
+      if (party.started) {
+        return socket.emit("partyError", {
+          message: "This game has already started.",
+        });
       }
-    );
 
-    // --------------------------------------------------------
-    // SUBMIT ANSWER
-    // --------------------------------------------------------
-
-    socket.on(
-      "submitAnswer",
-      data => {
-        const code =
-          getPartyCode(
-            data
-          );
-
-        const party =
-          parties.get(
-            code
-          );
-
-        if (!party) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "Party not found."
-            }
-          );
-        }
-
-        const player =
-          getPartyPlayer(
-            party,
-            socket.id
-          );
-
-        if (!player) {
-          return socket.emit(
-            "partyError",
-            {
-              message:
-                "You are not in this party."
-            }
-          );
-        }
-
-        if (
-          !party.started ||
-          party.finished
-        ) {
-          return;
-        }
-
-        if (
-          !party.currentRound
-        ) {
-          return;
-        }
-
-        if (
-          player.answered
-        ) {
-          return;
-        }
-
-        const answerId =
-          data?.answerId ??
-          data?.videoId ??
-          null;
-
-        player.answered =
-          true;
-
-        const correct =
-          answerId !==
-            null &&
-          String(
-            answerId
-          ) ===
-            String(
-              party.currentRound
-                .answerId
-            );
-
-        let points =
-          0;
-
-        if (
-          correct
-        ) {
-          const now =
-            Date.now();
-
-          const elapsed =
-            now -
-            party.roundStartedAt;
-
-          const remaining =
-            Math.max(
-              0,
-              ROUND_DURATION -
-                elapsed
-            );
-
-          points =
-            Math.max(
-              1,
-              Math.round(
-                10000 *
-                  (
-                    remaining /
-                    ROUND_DURATION
-                  )
-              )
-            );
-
-          player.score +=
-            points;
-
-          player.currentRoundPoints =
-            points;
-        }
-
-        io.to(party.code).emit(
-          "answerAccepted",
-          {
-            playerId: player.id,
-            correct,
-            points,
-            score: player.score,
-            totalScore: player.score,
-            answerId,
-            correctAnswerId:
-              party.currentRound.answerId
-          }
-        );
-
-        emitPartyUpdate(
-          party
-        );
-
-        const everyoneAnswered =
-          Array.from(
-            party.players.values()
-          ).every(
-            p =>
-              p.answered
-          );
-
-        if (
-          everyoneAnswered
-        ) {
-          finishCurrentRound(
-            party
-          );
-        }
+      if (party.players.size >= 20) {
+        return socket.emit("partyError", {
+          message: "This party is full.",
+        });
       }
+
+      party.players.set(socket.id, {
+        id: socket.id,
+
+        name,
+
+        score: 0,
+
+        answered: false,
+
+        currentRoundPoints: 0,
+      });
+
+      socket.join(code);
+
+      socket.data.partyCode = code;
+
+      socket.emit("partyJoined", {
+        party: serializeParty(party),
+      });
+
+      emitPartyUpdate(party);
+
+      console.log(`${name} joined party ${code}`);
+    } catch (error) {
+      console.error(error);
+
+      socket.emit("partyError", {
+        message: "Could not join party.",
+      });
+    }
+  });
+
+  // --------------------------------------------------------
+  // START PARTY
+  // --------------------------------------------------------
+
+  socket.on("startParty", async (data) => {
+    const code = getPartyCode(data);
+
+    const party = parties.get(code);
+
+    if (!party) {
+      return socket.emit("partyError", {
+        message: "Party not found.",
+      });
+    }
+
+    if (party.hostId !== socket.id) {
+      return socket.emit("partyError", {
+        message: "Only the host can start the game.",
+      });
+    }
+
+    if (party.started) {
+      return;
+    }
+
+    if (party.players.size < 1) {
+      return socket.emit("partyError", {
+        message: "At least one player is required.",
+      });
+    }
+
+    const ready = getReadyVideos();
+
+    if (ready.length < 1) {
+      return socket.emit("partyError", {
+        message: "There are no ready videos available.",
+      });
+    }
+
+    party.started = true;
+
+    party.finished = false;
+
+    party.roundNumber = 1;
+
+    for (const player of party.players.values()) {
+      player.score = 0;
+
+      player.answered = false;
+
+      player.currentRoundPoints = 0;
+    }
+
+    emitPartyUpdate(party);
+
+    await startNextRound(party);
+  });
+
+  // --------------------------------------------------------
+  // NEW GAME
+  // --------------------------------------------------------
+
+  socket.on("newGame", async (data) => {
+    const code = getPartyCode(data);
+
+    const party = parties.get(code);
+
+    if (!party) {
+      return socket.emit("partyError", {
+        message: "Party not found.",
+      });
+    }
+
+    if (party.hostId !== socket.id) {
+      return socket.emit("partyError", {
+        message: "Only the host can start a new game.",
+      });
+    }
+
+    if (party.started) {
+      return;
+    }
+
+    const ready = getReadyVideos();
+
+    if (ready.length < 1) {
+      return socket.emit("partyError", {
+        message: "There are no ready videos available.",
+      });
+    }
+
+    // ------------------------------------------------------
+    // RESET GAME
+    // ------------------------------------------------------
+
+    party.started = true;
+
+    party.finished = false;
+
+    party.roundNumber = 1;
+
+    party.currentRound = null;
+
+    party.roundFinished = false;
+
+    party.roundStartedAt = null;
+
+    party.roundEndsAt = null;
+
+    party.usedVideoIds = new Set();
+
+    if (party.roundTimer) {
+      clearTimeout(party.roundTimer);
+
+      party.roundTimer = null;
+    }
+
+    // Reset all player scores
+    // but keep the players in the party.
+    for (const player of party.players.values()) {
+      player.score = 0;
+
+      player.answered = false;
+
+      player.currentRoundPoints = 0;
+    }
+
+    // Tell all players that the new game has started.
+    io.to(party.code).emit("newGameStarted", {
+      party: serializeParty(party),
+    });
+
+    emitPartyUpdate(party);
+
+    await startNextRound(party);
+  });
+
+  // --------------------------------------------------------
+  // SUBMIT ANSWER
+  // --------------------------------------------------------
+
+  socket.on("submitAnswer", (data) => {
+    const code = getPartyCode(data);
+
+    const party = parties.get(code);
+
+    if (!party) {
+      return socket.emit("partyError", {
+        message: "Party not found.",
+      });
+    }
+
+    const player = getPartyPlayer(party, socket.id);
+
+    if (!player) {
+      return socket.emit("partyError", {
+        message: "You are not in this party.",
+      });
+    }
+
+    if (!party.started || party.finished) {
+      return;
+    }
+
+    if (!party.currentRound) {
+      return;
+    }
+
+    if (player.answered) {
+      return;
+    }
+
+    const answerId = data?.answerId ?? data?.videoId ?? null;
+
+    player.answered = true;
+
+    const correct =
+      answerId !== null &&
+      String(answerId) === String(party.currentRound.answerId);
+
+    let points = 0;
+
+    if (correct) {
+      const now = Date.now();
+
+      const elapsed = now - party.roundStartedAt;
+
+      const remaining = Math.max(0, ROUND_DURATION - elapsed);
+
+      points = Math.max(1, Math.round(10000 * (remaining / ROUND_DURATION)));
+
+      player.score += points;
+
+      player.currentRoundPoints = points;
+    }
+
+    io.to(party.code).emit("answerAccepted", {
+      playerId: player.id,
+      correct,
+      points,
+      score: player.score,
+      totalScore: player.score,
+      answerId,
+      correctAnswerId: party.currentRound.answerId,
+    });
+
+    emitPartyUpdate(party);
+
+    const everyoneAnswered = Array.from(party.players.values()).every(
+      (p) => p.answered,
     );
 
-    // --------------------------------------------------------
-    // LEAVE PARTY
-    // --------------------------------------------------------
+    if (everyoneAnswered) {
+      finishCurrentRound(party);
+    }
+  });
 
-    socket.on(
-      "leaveParty",
-      data => {
-        const code =
-          getPartyCode(
-            data
-          );
+  // --------------------------------------------------------
+  // LEAVE PARTY
+  // --------------------------------------------------------
 
-        const party =
-          parties.get(
-            code
-          );
+  socket.on("leaveParty", (data) => {
+    const code = getPartyCode(data);
 
-        if (!party) {
-          return;
-        }
+    const party = parties.get(code);
 
-        party.players.delete(
-          socket.id
-        );
+    if (!party) {
+      return;
+    }
 
-        socket.leave(
-          code
-        );
+    party.players.delete(socket.id);
 
-        socket.data.partyCode =
-          null;
+    socket.leave(code);
 
-        if (
-          party.players.size ===
-          0
-        ) {
-          if (
-            party.roundTimer
-          ) {
-            clearTimeout(
-              party.roundTimer
-            );
-          }
+    socket.data.partyCode = null;
 
-          parties.delete(
-            code
-          );
-
-          console.log(
-            `Party ${code} deleted because it became empty.`
-          );
-
-          return;
-        }
-
-        if (
-          party.hostId ===
-          socket.id
-        ) {
-          const nextHost =
-            party.players
-              .values()
-              .next()
-              .value;
-
-          if (
-            nextHost
-          ) {
-            party.hostId =
-              nextHost.id;
-
-            io.to(
-              code
-            ).emit(
-              "hostChanged",
-              {
-                hostId:
-                  nextHost.id,
-
-                party:
-                  serializeParty(
-                    party
-                  )
-              }
-            );
-          }
-        }
-
-        emitPartyUpdate(
-          party
-        );
+    if (party.players.size === 0) {
+      if (party.roundTimer) {
+        clearTimeout(party.roundTimer);
       }
-    );
 
-    // --------------------------------------------------------
-    // DISCONNECT
-    // --------------------------------------------------------
+      parties.delete(code);
 
-    socket.on(
-      "disconnect",
-      () => {
-        console.log(
-          `Socket disconnected: ${socket.id}`
-        );
+      console.log(`Party ${code} deleted because it became empty.`);
 
-        const code =
-          socket.data.partyCode;
+      return;
+    }
 
-        if (!code) {
-          return;
-        }
+    if (party.hostId === socket.id) {
+      const nextHost = party.players.values().next().value;
 
-        const party =
-          parties.get(
-            code
-          );
+      if (nextHost) {
+        party.hostId = nextHost.id;
 
-        if (!party) {
-          return;
-        }
+        io.to(code).emit("hostChanged", {
+          hostId: nextHost.id,
 
-        party.players.delete(
-          socket.id
-        );
-
-        if (
-          party.players.size ===
-          0
-        ) {
-          if (
-            party.roundTimer
-          ) {
-            clearTimeout(
-              party.roundTimer
-            );
-          }
-
-          parties.delete(
-            code
-          );
-
-          return;
-        }
-
-        if (
-          party.hostId ===
-          socket.id
-        ) {
-          const nextHost =
-            party.players
-              .values()
-              .next()
-              .value;
-
-          if (
-            nextHost
-          ) {
-            party.hostId =
-              nextHost.id;
-
-            io.to(
-              code
-            ).emit(
-              "hostChanged",
-              {
-                hostId:
-                  nextHost.id,
-
-                party:
-                  serializeParty(
-                    party
-                  )
-              }
-            );
-          }
-        }
-
-        emitPartyUpdate(
-          party
-        );
+          party: serializeParty(party),
+        });
       }
-    );
-  }
-);
+    }
+
+    emitPartyUpdate(party);
+  });
+
+  // --------------------------------------------------------
+  // DISCONNECT
+  // --------------------------------------------------------
+
+  socket.on("disconnect", () => {
+    console.log(`Socket disconnected: ${socket.id}`);
+
+    const code = socket.data.partyCode;
+
+    if (!code) {
+      return;
+    }
+
+    const party = parties.get(code);
+
+    if (!party) {
+      return;
+    }
+
+    party.players.delete(socket.id);
+
+    if (party.players.size === 0) {
+      if (party.roundTimer) {
+        clearTimeout(party.roundTimer);
+      }
+
+      parties.delete(code);
+
+      return;
+    }
+
+    if (party.hostId === socket.id) {
+      const nextHost = party.players.values().next().value;
+
+      if (nextHost) {
+        party.hostId = nextHost.id;
+
+        io.to(code).emit("hostChanged", {
+          hostId: nextHost.id,
+
+          party: serializeParty(party),
+        });
+      }
+    }
+
+    emitPartyUpdate(party);
+  });
+});
 
 // ============================================================
 // START SERVER
@@ -4510,64 +2608,33 @@ async function startServer() {
 
     await loadDb();
 
-    server.listen(
-      PORT,
-      "0.0.0.0",
-      () => {
-        console.log(
-          ""
-        );
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log("");
 
-        console.log(
-          "======================================"
-        );
+      console.log("======================================");
 
-        console.log(
-          `Guess Game running on port ${PORT}`
-        );
+      console.log(`Guess Game running on port ${PORT}`);
 
-        console.log(
-          `http://localhost:${PORT}`
-        );
+      console.log(`http://localhost:${PORT}`);
 
-        console.log(
-          "======================================"
-        );
+      console.log("======================================");
 
-        console.log(
-          `Environment: ${APP_ENV}`
-        );
+      console.log(`Environment: ${APP_ENV}`);
 
-        console.log(
-          `Loaded ${videoDb.length} online videos`
-        );
+      console.log(`Loaded ${videoDb.length} online videos`);
 
-        console.log(
-          `R2 bucket: ${R2_BUCKET_NAME}`
-        );
+      console.log(`R2 bucket: ${R2_BUCKET_NAME}`);
 
-        if (IS_LOCAL) {
-          console.log(
-            `Local backup: ${BACKUP}`
-          );
+      if (IS_LOCAL) {
+        console.log(`Local backup: ${BACKUP}`);
 
-          console.log(
-            `Run "node backup.js upload" to publish local videos.`
-          );
-        }
-
-        console.log(
-          ""
-        );
+        console.log(`Run "node backup.js upload" to publish local videos.`);
       }
-    );
-  } catch (
-    error
-  ) {
-    console.error(
-      "Failed to start server:",
-      error
-    );
+
+      console.log("");
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
 
     process.exit(1);
   }

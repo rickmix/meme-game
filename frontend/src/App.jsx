@@ -1,7 +1,4 @@
-import {
-  useRef,
-  useState
-} from "react";
+import { useRef, useState } from "react";
 
 import SinglePlayer from "./game/SinglePlayer.jsx";
 import Multiplayer from "./game/Multiplayer.jsx";
@@ -9,8 +6,7 @@ import Admin from "./admin/Admin.jsx";
 import AdminLogin from "./admin/AdminLogin.jsx";
 
 function App() {
-  const path =
-    window.location.pathname;
+  const path = window.location.pathname;
 
   if (path === "/admin") {
     return <Admin />;
@@ -24,32 +20,22 @@ function App() {
 }
 
 function Game() {
-  const [mode, setMode] =
-    useState("single");
+  const [mode, setMode] = useState("single");
 
-  const [singleGameActive, setSingleGameActive] =
-    useState(false);
+  const [singleGameActive, setSingleGameActive] = useState(false);
 
-  const [multiGameActive, setMultiGameActive] =
-    useState(false);
+  const [multiGameActive, setMultiGameActive] = useState(false);
 
-  const singlePlayerRef =
-    useRef(null);
+  const singlePlayerRef = useRef(null);
 
-  const multiplayerRef =
-    useRef(null);
+  const multiplayerRef = useRef(null);
 
   function switchToSingle() {
-    if (
-      mode === "multi"
-    ) {
-      if (
-        multiGameActive
-      ) {
-        const confirmed =
-          window.confirm(
-            "Are you sure? Your current multiplayer game will be ended."
-          );
+    if (mode === "multi") {
+      if (multiGameActive) {
+        const confirmed = window.confirm(
+          "Are you sure? Your current multiplayer game will be ended.",
+        );
 
         if (!confirmed) {
           return;
@@ -66,16 +52,11 @@ function Game() {
   }
 
   function switchToMulti() {
-    if (
-      mode === "single"
-    ) {
-      if (
-        singleGameActive
-      ) {
-        const confirmed =
-          window.confirm(
-            "Are you sure? Your current game will be ended."
-          );
+    if (mode === "single") {
+      if (singleGameActive) {
+        const confirmed = window.confirm(
+          "Are you sure? Your current game will be ended.",
+        );
 
         if (!confirmed) {
           return;
@@ -95,13 +76,9 @@ function Game() {
     <main className="app">
       <header>
         <div>
-          <div className="eyebrow">
-            Quiz
-          </div>
+          <div className="eyebrow">Quiz</div>
 
-          <h1>
-            Meme master 3000
-          </h1>
+          <h1>Meme master 3000</h1>
         </div>
       </header>
 
@@ -109,14 +86,8 @@ function Game() {
         <button
           id="singleTab"
           type="button"
-          className={`tab ${
-            mode === "single"
-              ? "active"
-              : ""
-          }`}
-          onClick={
-            switchToSingle
-          }
+          className={`tab ${mode === "single" ? "active" : ""}`}
+          onClick={switchToSingle}
         >
           Single Player
         </button>
@@ -124,14 +95,8 @@ function Game() {
         <button
           id="multiTab"
           type="button"
-          className={`tab ${
-            mode === "multi"
-              ? "active"
-              : ""
-          }`}
-          onClick={
-            switchToMulti
-          }
+          className={`tab ${mode === "multi" ? "active" : ""}`}
+          onClick={switchToMulti}
         >
           Multiplayer
         </button>
@@ -140,16 +105,12 @@ function Game() {
       {mode === "single" ? (
         <SinglePlayer
           ref={singlePlayerRef}
-          onGameActiveChange={
-            setSingleGameActive
-          }
+          onGameActiveChange={setSingleGameActive}
         />
       ) : (
         <Multiplayer
           ref={multiplayerRef}
-          onGameActiveChange={
-            setMultiGameActive
-          }
+          onGameActiveChange={setMultiGameActive}
         />
       )}
     </main>

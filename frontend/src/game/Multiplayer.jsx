@@ -4,7 +4,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState
+  useState,
 } from "react";
 
 import { io } from "socket.io-client";
@@ -35,45 +35,27 @@ const INITIAL_STATE = {
   correctAnswerId: null,
   timeUp: false,
   playing: false,
-  answerCorrect: null
+  answerCorrect: null,
 };
 
 function getChoiceId(choice) {
-  if (
-    choice === null ||
-    choice === undefined
-  ) {
+  if (choice === null || choice === undefined) {
     return null;
   }
 
-  if (
-    typeof choice === "string" ||
-    typeof choice === "number"
-  ) {
+  if (typeof choice === "string" || typeof choice === "number") {
     return choice;
   }
 
-  return (
-    choice.id ??
-    choice.videoId ??
-    choice.answerId ??
-    choice._id ??
-    null
-  );
+  return choice.id ?? choice.videoId ?? choice.answerId ?? choice._id ?? null;
 }
 
 function getChoiceTitle(choice) {
-  if (
-    choice === null ||
-    choice === undefined
-  ) {
+  if (choice === null || choice === undefined) {
     return "";
   }
 
-  if (
-    typeof choice === "string" ||
-    typeof choice === "number"
-  ) {
+  if (typeof choice === "string" || typeof choice === "number") {
     return String(choice);
   }
 
@@ -83,429 +65,288 @@ function getChoiceTitle(choice) {
     choice.videoTitle ??
     choice.label ??
     choice.text ??
-    String(
-      choice.id ??
-        choice.videoId ??
-        ""
-    )
+    String(choice.id ?? choice.videoId ?? "")
   );
 }
 
 function getPlayerId(player) {
   return (
-    player?.id ??
-    player?.socketId ??
-    player?.playerId ??
-    player?.userId ??
-    null
+    player?.id ?? player?.socketId ?? player?.playerId ?? player?.userId ?? null
   );
 }
 
 function getPlayerName(player) {
-  return (
-    player?.name ??
-    player?.username ??
-    "Player"
-  );
+  return player?.name ?? player?.username ?? "Player";
 }
 
 function getPlayerScore(player) {
   return Number(
     player?.score ??
-    player?.points ??
-    player?.totalScore ??
-    player?.roundScore ??
-    player?.roundPoints ??
-    0
+      player?.points ??
+      player?.totalScore ??
+      player?.roundScore ??
+      player?.roundPoints ??
+      0,
   );
 }
 
 function formatSeconds(seconds) {
-  const value =
-    Number(seconds) || 0;
+  const value = Number(seconds) || 0;
 
   if (value < 10) {
     return value.toFixed(1);
   }
 
-  return String(
-    Math.round(value)
-  );
+  return String(Math.round(value));
 }
 
 function formatScoreChange(player) {
-  if (
-    player?.points !== undefined
-  ) {
+  if (player?.points !== undefined) {
     return `+${player.points}`;
   }
 
-  if (
-    player?.roundPoints !== undefined
-  ) {
+  if (player?.roundPoints !== undefined) {
     return `+${player.roundPoints}`;
   }
 
-  if (
-    player?.score !== undefined
-  ) {
+  if (player?.score !== undefined) {
     return String(player.score);
   }
 
-  if (
-    player?.totalScore !== undefined
-  ) {
-    return String(
-      player.totalScore
-    );
+  if (player?.totalScore !== undefined) {
+    return String(player.totalScore);
   }
 
   return "0";
 }
 
-const Multiplayer = forwardRef(
-  function Multiplayer(
-    {
-      onGameActiveChange
-    },
-    ref
-  ) {
-    const [state, setState] =
-      useState(INITIAL_STATE);
+const Multiplayer = forwardRef(function Multiplayer(
+  { onGameActiveChange },
+  ref,
+) {
+  const [state, setState] = useState(INITIAL_STATE);
 
-    const [createName, setCreateName] =
-      useState("");
+  const [createName, setCreateName] = useState("");
 
-    const [joinName, setJoinName] =
-      useState("");
+  const [joinName, setJoinName] = useState("");
 
-    const [partyCodeInput, setPartyCodeInput] =
-      useState("");
+  const [partyCodeInput, setPartyCodeInput] = useState("");
 
-    const [roundCount, setRoundCount] =
-      useState("10");
+  const [roundCount, setRoundCount] = useState("10");
 
-    const [setupError, setSetupError] =
-      useState("");
+  const [setupError, setSetupError] = useState("");
 
-    const [roundResults, setRoundResults] =
-      useState([]);
+  const [roundResults, setRoundResults] = useState([]);
 
-    const [finalPlayers, setFinalPlayers] =
-      useState([]);
+  const [finalPlayers, setFinalPlayers] = useState([]);
 
-    const [winner, setWinner] =
-      useState(null);
+  const [winner, setWinner] = useState(null);
 
-    const [winnerMessage, setWinnerMessage] =
-      useState("");
+  const [winnerMessage, setWinnerMessage] = useState("");
 
-    const audioRef =
-      useRef(null);
+  const audioRef = useRef(null);
 
-    const multiProgressRef =
-      useRef(null);
+  const multiProgressRef = useRef(null);
 
-    const roundProgressRef =
-      useRef(null);
+  const roundProgressRef = useRef(null);
 
-    const clipTimerRef =
-      useRef(null);
+  const clipTimerRef = useRef(null);
 
-    const countdownTimerRef =
-      useRef(null);
+  const countdownTimerRef = useRef(null);
 
-    const timerRef =
-      useRef(null);
+  const timerRef = useRef(null);
 
-    const progressAnimationRef =
-      useRef(null);
+  const progressAnimationRef = useRef(null);
 
-    const stateRef =
-      useRef(state);
+  const stateRef = useRef(state);
 
-    const scoreboardRowsRef =
-      useRef(null);
+  const scoreboardRowsRef = useRef(null);
 
-    const previousScoresRef =
-      useRef(new Map());
+  const previousScoresRef = useRef(new Map());
 
-    const roundScoresRef =
-      useRef(new Map());
+  const roundScoresRef = useRef(new Map());
 
-    useEffect(() => {
-      stateRef.current = state;
-    }, [state]);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-    const clearTimers =
-      useCallback(() => {
-        clearTimeout(
-          clipTimerRef.current
-        );
+  const clearTimers = useCallback(() => {
+    clearTimeout(clipTimerRef.current);
 
-        clearTimeout(
-          countdownTimerRef.current
-        );
+    clearTimeout(countdownTimerRef.current);
 
-        clearTimeout(
-          timerRef.current
-        );
+    clearTimeout(timerRef.current);
 
-        cancelAnimationFrame(
-          progressAnimationRef.current
-        );
+    cancelAnimationFrame(progressAnimationRef.current);
 
-        clipTimerRef.current = null;
-        countdownTimerRef.current = null;
-        timerRef.current = null;
-        progressAnimationRef.current =
-          null;
-      }, []);
+    clipTimerRef.current = null;
+    countdownTimerRef.current = null;
+    timerRef.current = null;
+    progressAnimationRef.current = null;
+  }, []);
 
-    const stopMultiAudio =
-      useCallback(() => {
-        clearTimeout(
-          clipTimerRef.current
-        );
+  const stopMultiAudio = useCallback(() => {
+    clearTimeout(clipTimerRef.current);
 
-        cancelAnimationFrame(
-          progressAnimationRef.current
-        );
+    cancelAnimationFrame(progressAnimationRef.current);
 
-        clipTimerRef.current = null;
-        progressAnimationRef.current =
-          null;
+    clipTimerRef.current = null;
+    progressAnimationRef.current = null;
 
-        const audio =
-          audioRef.current;
+    const audio = audioRef.current;
 
-        if (audio) {
-          audio.pause();
-        }
+    if (audio) {
+      audio.pause();
+    }
 
-        if (
-          multiProgressRef.current
-        ) {
-          multiProgressRef.current.style.width =
-            "0%";
-        }
+    if (multiProgressRef.current) {
+      multiProgressRef.current.style.width = "0%";
+    }
 
-        setState((current) => ({
-          ...current,
-          playing: false
-        }));
-      }, []);
+    setState((current) => ({
+      ...current,
+      playing: false,
+    }));
+  }, []);
 
-    const cleanupMultiplayer =
-      useCallback(() => {
-        clearTimers();
-        stopMultiAudio();
+  const cleanupMultiplayer = useCallback(() => {
+    clearTimers();
+    stopMultiAudio();
 
-        if (
-          stateRef.current.inParty
-        ) {
-          const code =
-            stateRef.current.partyCode;
+    if (stateRef.current.inParty) {
+      const code = stateRef.current.partyCode;
 
-          if (code) {
-            socket.emit(
-              "leaveParty",
-              {
-                code,
-                partyCode: code
-              }
-            );
-          }
-        }
-
-        socket.disconnect();
-      }, [
-        clearTimers,
-        stopMultiAudio
-      ]);
-
-    const resetState =
-      useCallback(() => {
-        clearTimers();
-
-        const audio =
-          audioRef.current;
-
-        if (audio) {
-          audio.pause();
-
-          try {
-            audio.currentTime = 0;
-          } catch (error) {
-            console.warn(error);
-          }
-
-          audio.removeAttribute(
-            "src"
-          );
-
-          audio.load();
-        }
-
-        if (
-          multiProgressRef.current
-        ) {
-          multiProgressRef.current.style.width =
-            "0%";
-        }
-
-        if (
-          roundProgressRef.current
-        ) {
-          roundProgressRef.current.style.width =
-            "100%";
-
-          roundProgressRef.current.classList.remove(
-            "timer-green",
-            "timer-orange",
-            "timer-red"
-          );
-        }
-
-        previousScoresRef.current =
-          new Map();
-
-        setState({
-          ...INITIAL_STATE
+      if (code) {
+        socket.emit("leaveParty", {
+          code,
+          partyCode: code,
         });
+      }
+    }
 
-        setRoundResults([]);
-        setFinalPlayers([]);
-        setWinner(null);
-        setWinnerMessage("");
+    socket.disconnect();
+  }, [clearTimers, stopMultiAudio]);
 
-        onGameActiveChange?.(
-          false
-        );
-      }, [
-        clearTimers,
-        onGameActiveChange
-      ]);
+  const resetState = useCallback(() => {
+    clearTimers();
 
-    const showSetup =
-      useCallback(() => {
-        setState((current) => ({
-          ...current,
-          started: false
-        }));
-      }, []);
+    const audio = audioRef.current;
 
-    const showLobby =
-      useCallback(() => {
-        setRoundResults([]);
-        setFinalPlayers([]);
-        setWinner(null);
-        setWinnerMessage("");
-      }, []);
+    if (audio) {
+      audio.pause();
 
-    const applyParty =
-      useCallback(
-        (party) => {
-          if (!party) {
-            return;
-          }
+      try {
+        audio.currentTime = 0;
+      } catch (error) {
+        console.warn(error);
+      }
 
-          const players =
-            party.players ||
-            party.playerList ||
-            [];
+      audio.removeAttribute("src");
 
-          const partyCode =
-            party.code ||
-            party.partyCode ||
-            stateRef.current.partyCode;
+      audio.load();
+    }
 
-          let isHost =
-            stateRef.current.isHost;
+    if (multiProgressRef.current) {
+      multiProgressRef.current.style.width = "0%";
+    }
 
-          if (party.hostId) {
-            isHost =
-              String(
-                party.hostId
-              ) ===
-              String(
-                socket.id
-              );
-          }
+    if (roundProgressRef.current) {
+      roundProgressRef.current.style.width = "100%";
 
-          if (
-            party.isHost !==
-            undefined
-          ) {
-            isHost =
-              Boolean(
-                party.isHost
-              );
-          }
+      roundProgressRef.current.classList.remove(
+        "timer-green",
+        "timer-orange",
+        "timer-red",
+      );
+    }
 
-          const started =
-            Boolean(
-              party.started
-            );
+    previousScoresRef.current = new Map();
 
-          const finished =
-            Boolean(
-              party.gameFinished ||
-                party.finished
-            );
+    setState({
+      ...INITIAL_STATE,
+    });
 
-          const totalRounds =
-            Number(
-              party.totalRounds ||
-                party.rounds ||
-                stateRef.current.totalRounds
-            );
+    setRoundResults([]);
+    setFinalPlayers([]);
+    setWinner(null);
+    setWinnerMessage("");
 
-          setState((current) => ({
-            ...current,
-            inParty: true,
-            partyCode,
-            isHost,
-            hostId:
-              party.hostId ??
-              current.hostId,
-            players,
-            started,
-            finished,
-            totalRounds
-          }));
+    onGameActiveChange?.(false);
+  }, [clearTimers, onGameActiveChange]);
 
-          if (started) {
-            onGameActiveChange?.(
-              true
-            );
-          }
+  const showSetup = useCallback(() => {
+    setState((current) => ({
+      ...current,
+      started: false,
+    }));
+  }, []);
 
-          if (
-            !started &&
-            !finished
-          ) {
-            showLobby();
-          }
-        },
-        [
-          onGameActiveChange,
-          showLobby
-        ]
+  const showLobby = useCallback(() => {
+    setRoundResults([]);
+    setFinalPlayers([]);
+    setWinner(null);
+    setWinnerMessage("");
+  }, []);
+
+  const applyParty = useCallback(
+    (party) => {
+      if (!party) {
+        return;
+      }
+
+      const players = party.players || party.playerList || [];
+
+      const partyCode =
+        party.code || party.partyCode || stateRef.current.partyCode;
+
+      let isHost = stateRef.current.isHost;
+
+      if (party.hostId) {
+        isHost = String(party.hostId) === String(socket.id);
+      }
+
+      if (party.isHost !== undefined) {
+        isHost = Boolean(party.isHost);
+      }
+
+      const started = Boolean(party.started);
+
+      const finished = Boolean(party.gameFinished || party.finished);
+
+      const totalRounds = Number(
+        party.totalRounds || party.rounds || stateRef.current.totalRounds,
       );
 
-    const createParty =
-  useCallback(() => {
-    const name =
-      createName.trim();
+      setState((current) => ({
+        ...current,
+        inParty: true,
+        partyCode,
+        isHost,
+        hostId: party.hostId ?? current.hostId,
+        players,
+        started,
+        finished,
+        totalRounds,
+      }));
 
-    const rounds =
-      Number(roundCount);
+      if (started) {
+        onGameActiveChange?.(true);
+      }
+
+      if (!started && !finished) {
+        showLobby();
+      }
+    },
+    [onGameActiveChange, showLobby],
+  );
+
+  const createParty = useCallback(() => {
+    const name = createName.trim();
+
+    const rounds = Number(roundCount);
 
     if (!name) {
-      setSetupError(
-        "Please enter your name."
-      );
+      setSetupError("Please enter your name.");
 
       return;
     }
@@ -516,42 +357,26 @@ const Multiplayer = forwardRef(
       socket.connect();
     }
 
-    socket.emit(
-      "createParty",
-      {
-        name,
-        rounds,
-        totalRounds:
-          rounds
-      }
-    );
-  }, [
-    createName,
-    roundCount
-  ]);
+    socket.emit("createParty", {
+      name,
+      rounds,
+      totalRounds: rounds,
+    });
+  }, [createName, roundCount]);
 
-    const joinParty =
-  useCallback(() => {
-    const name =
-      joinName.trim();
+  const joinParty = useCallback(() => {
+    const name = joinName.trim();
 
-    const code =
-      partyCodeInput
-        .trim()
-        .toUpperCase();
+    const code = partyCodeInput.trim().toUpperCase();
 
     if (!name) {
-      setSetupError(
-        "Please enter your name."
-      );
+      setSetupError("Please enter your name.");
 
       return;
     }
 
     if (!code) {
-      setSetupError(
-        "Please enter a party code."
-      );
+      setSetupError("Please enter a party code.");
 
       return;
     }
@@ -562,681 +387,411 @@ const Multiplayer = forwardRef(
       socket.connect();
     }
 
-    socket.emit(
-      "joinParty",
-      {
-        name,
+    socket.emit("joinParty", {
+      name,
+      code,
+      partyCode: code,
+    });
+  }, [joinName, partyCodeInput]);
+
+  const startParty = useCallback(() => {
+    if (!stateRef.current.partyCode) {
+      return;
+    }
+
+    socket.emit("startParty", {
+      code: stateRef.current.partyCode,
+      partyCode: stateRef.current.partyCode,
+    });
+  }, []);
+
+  const leaveParty = useCallback(() => {
+    const code = stateRef.current.partyCode;
+
+    if (code) {
+      socket.emit("leaveParty", {
         code,
-        partyCode: code
-      }
-    );
-  }, [
-    joinName,
-    partyCodeInput
-  ]);
+        partyCode: code,
+      });
+    }
 
-    const startParty =
-      useCallback(() => {
-        if (
-          !stateRef.current.partyCode
-        ) {
-          return;
-        }
+    resetState();
+  }, [resetState]);
 
-        socket.emit(
-          "startParty",
-          {
-            code:
-              stateRef.current
-                .partyCode,
-            partyCode:
-              stateRef.current
-                .partyCode
-          }
-        );
-      }, []);
+  const newGame = useCallback(() => {
+    const code = stateRef.current.partyCode;
 
-    const leaveParty =
-      useCallback(() => {
-        const code =
-          stateRef.current.partyCode;
+    if (!code) {
+      return;
+    }
 
-        if (code) {
-          socket.emit(
-            "leaveParty",
-            {
-              code,
-              partyCode: code
-            }
-          );
-        }
+    socket.emit("newGame", {
+      code,
+      partyCode: code,
+    });
+  }, []);
 
-        resetState();
-      }, [resetState]);
-
-    const newGame =
-      useCallback(() => {
-        const code =
-          stateRef.current.partyCode;
-
-        if (!code) {
-          return;
-        }
-
-        socket.emit(
-          "newGame",
-          {
-            code,
-            partyCode: code
-          }
-        );
-      }, []);
-
-    const updateAudioProgress =
-      useCallback(
-        (
-          start,
-          duration
-        ) => {
-          cancelAnimationFrame(
-            progressAnimationRef.current
-          );
-
-          const update = () => {
-            const audio =
-              audioRef.current;
-
-            const progress =
-              multiProgressRef.current;
-
-            if (
-              !audio ||
-              !progress
-            ) {
-              return;
-            }
-
-            const elapsed =
-              Math.max(
-                0,
-                Math.min(
-                  duration,
-                  audio.currentTime -
-                    start
-                )
-              );
-
-            const percentage =
-              duration > 0
-                ? (elapsed /
-                    duration) *
-                  100
-                : 0;
-
-            progress.style.width =
-              `${percentage}%`;
-
-            if (
-              !audio.paused &&
-              elapsed < duration
-            ) {
-              progressAnimationRef.current =
-                requestAnimationFrame(
-                  update
-                );
-            }
-          };
-
-          update();
-        },
-        []
-      );
-
-    const submitMultiAnswer =
-      useCallback(
-        (answerId) => {
-          const current =
-            stateRef.current;
-
-          if (
-            current.answered
-          ) {
-            return;
-          }
-
-          setState((value) => ({
-            ...value,
-            answered: true,
-            selectedAnswerId:
-              answerId,
-            timeUp:
-              answerId === null,
-            answerCorrect:
-              null
-          }));
-
-          stopMultiAudio();
-
-          if (
-            roundProgressRef.current
-          ) {
-            roundProgressRef.current.style.width =
-              "0%";
-          }
-
-          socket.emit(
-            "submitAnswer",
-            {
-              code:
-                current.partyCode,
-              partyCode:
-                current.partyCode,
-              answerId,
-              videoId: answerId
-            }
-          );
-        },
-        [stopMultiAudio]
-      );
-
-    const startAnswerTimer =
-  useCallback(() => {
-    clearTimeout(
-      timerRef.current
-    );
-
-    const current =
-      stateRef.current;
-
-    const duration =
-      Number(
-        current.duration
-      ) || 15;
-
-    const startAt =
-      current.startAt
-        ? new Date(
-            current.startAt
-          ).getTime()
-        : Date.now();
-
-    const roundEnd =
-      startAt +
-      duration * 1000;
+  const updateAudioProgress = useCallback((start, duration) => {
+    cancelAnimationFrame(progressAnimationRef.current);
 
     const update = () => {
-      const currentState =
-        stateRef.current;
+      const audio = audioRef.current;
 
-      if (
-        !currentState.started ||
-        currentState.finished
-      ) {
+      const progress = multiProgressRef.current;
+
+      if (!audio || !progress) {
         return;
       }
 
-      const now =
-        Date.now();
+      const elapsed = Math.max(
+        0,
+        Math.min(duration, audio.currentTime - start),
+      );
 
-      const remaining =
-        Math.max(
-          0,
-          roundEnd - now
-        );
+      const percentage = duration > 0 ? (elapsed / duration) * 100 : 0;
+
+      progress.style.width = `${percentage}%`;
+
+      if (!audio.paused && elapsed < duration) {
+        progressAnimationRef.current = requestAnimationFrame(update);
+      }
+    };
+
+    update();
+  }, []);
+
+  const submitMultiAnswer = useCallback(
+    (answerId) => {
+      const current = stateRef.current;
+
+      if (current.answered) {
+        return;
+      }
+
+      setState((value) => ({
+        ...value,
+        answered: true,
+        selectedAnswerId: answerId,
+        timeUp: answerId === null,
+        answerCorrect: null,
+      }));
+
+      stopMultiAudio();
+
+      if (roundProgressRef.current) {
+        roundProgressRef.current.style.width = "0%";
+      }
+
+      socket.emit("submitAnswer", {
+        code: current.partyCode,
+        partyCode: current.partyCode,
+        answerId,
+        videoId: answerId,
+      });
+    },
+    [stopMultiAudio],
+  );
+
+  const startAnswerTimer = useCallback(() => {
+    clearTimeout(timerRef.current);
+
+    const current = stateRef.current;
+
+    const duration = Number(current.duration) || 15;
+
+    const startAt = current.startAt
+      ? new Date(current.startAt).getTime()
+      : Date.now();
+
+    const roundEnd = startAt + duration * 1000;
+
+    const update = () => {
+      const currentState = stateRef.current;
+
+      if (!currentState.started || currentState.finished) {
+        return;
+      }
+
+      const now = Date.now();
+
+      const remaining = Math.max(0, roundEnd - now);
 
       const percentage =
-        duration > 0
-          ? (remaining /
-              (duration * 1000)) *
-            100
-          : 0;
+        duration > 0 ? (remaining / (duration * 1000)) * 100 : 0;
 
-      if (
-        roundProgressRef.current
-      ) {
-        const progress =
-          roundProgressRef.current;
+      if (roundProgressRef.current) {
+        const progress = roundProgressRef.current;
 
-        progress.style.width =
-          `${percentage}%`;
+        progress.style.width = `${percentage}%`;
 
-        progress.classList.remove(
-          "timer-green",
-          "timer-orange",
-          "timer-red"
-        );
+        progress.classList.remove("timer-green", "timer-orange", "timer-red");
 
-        if (
-          percentage <= 30
-        ) {
-          progress.classList.add(
-            "timer-red"
-          );
-        } else if (
-          percentage <= 60
-        ) {
-          progress.classList.add(
-            "timer-orange"
-          );
+        if (percentage <= 30) {
+          progress.classList.add("timer-red");
+        } else if (percentage <= 60) {
+          progress.classList.add("timer-orange");
         } else {
-          progress.classList.add(
-            "timer-green"
-          );
+          progress.classList.add("timer-green");
         }
       }
 
       if (remaining <= 0) {
-  if (!currentState.answered) {
-    submitMultiAnswer(null);
-  }
+        if (!currentState.answered) {
+          submitMultiAnswer(null);
+        }
 
-  requestAnimationFrame(() => {
-    const container =
-      scoreboardRowsRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const rows =
-      container.querySelectorAll(
-        ".score-row"
-      );
-
-    rows.forEach((row) => {
-      const playerId =
-        row.dataset.playerId;
-
-      if (!playerId) {
-        return;
-      }
-
-      const scoreChange =
-        roundScoresRef.current.get(
-          String(playerId)
-        );
-
-      if (scoreChange === undefined) {
-        row.classList.remove(
-          "score-waiting",
-          "finished"
-        );
-
-        row.classList.add(
-          "incorrect"
-        );
-      }
-    });
-  });
-
-  return;
-}
-
-      timerRef.current =
-        setTimeout(
-          update,
-          50
-        );
-    };
-
-    update();
-  }, [
-    submitMultiAnswer
-  ]);
-
-    const playMultiClip =
-      useCallback(
-        async () => {
-          const audio =
-            audioRef.current;
-
-          if (!audio) {
-            return;
-          }
-
-          try {
-            const current =
-              stateRef.current;
-
-            const start =
-              Number(
-                current.startTime
-              ) || 0;
-
-            const duration =
-              Number(
-                current.audioDuration
-              ) || 0;
-
-            audio.currentTime =
-              start;
-
-            await audio.play();
-
-            setState((current) => ({
-              ...current,
-              playing: true
-            }));
-
-            updateAudioProgress(
-              start,
-              duration
-            );
-          } catch (error) {
-            console.error(
-              "Multiplayer audio playback failed:",
-              error
-            );
-          }
-        },
-        [
-          updateAudioProgress
-        ]
-      );
-
-    const startRound =
-  useCallback(
-    (round) => {
-      clearTimers();
-
-      stopMultiAudio();
-
-      roundScoresRef.current =
-        new Map();
-
-      requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const container =
-            scoreboardRowsRef.current;
+          const container = scoreboardRowsRef.current;
 
           if (!container) {
             return;
           }
 
-          const rows =
-            container.querySelectorAll(
-              ".score-row"
-            );
+          const rows = container.querySelectorAll(".score-row");
 
           rows.forEach((row) => {
-            row.classList.remove(
-              "score-changed",
-              "finished",
-              "incorrect"
-            );
+            const playerId = row.dataset.playerId;
 
-            row.classList.add(
-              "score-waiting"
-            );
+            if (!playerId) {
+              return;
+            }
 
-            const oldPoints =
-              row.querySelector(
-                ".round-score-animation"
-              );
+            const scoreChange = roundScoresRef.current.get(String(playerId));
+
+            if (scoreChange === undefined) {
+              row.classList.remove("score-waiting", "finished");
+
+              row.classList.add("incorrect");
+            }
+          });
+        });
+
+        return;
+      }
+
+      timerRef.current = setTimeout(update, 50);
+    };
+
+    update();
+  }, [submitMultiAnswer]);
+
+  const playMultiClip = useCallback(async () => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    try {
+      const current = stateRef.current;
+
+      const start = Number(current.startTime) || 0;
+
+      const duration = Number(current.audioDuration) || 0;
+
+      audio.currentTime = start;
+
+      await audio.play();
+
+      setState((current) => ({
+        ...current,
+        playing: true,
+      }));
+
+      updateAudioProgress(start, duration);
+    } catch (error) {
+      console.error("Multiplayer audio playback failed:", error);
+    }
+  }, [updateAudioProgress]);
+
+  const startRound = useCallback(
+    (round) => {
+      clearTimers();
+
+      stopMultiAudio();
+
+      roundScoresRef.current = new Map();
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const container = scoreboardRowsRef.current;
+
+          if (!container) {
+            return;
+          }
+
+          const rows = container.querySelectorAll(".score-row");
+
+          rows.forEach((row) => {
+            row.classList.remove("score-changed", "finished", "incorrect");
+
+            row.classList.add("score-waiting");
+
+            const oldPoints = row.querySelector(".round-score-animation");
 
             if (oldPoints) {
               oldPoints.remove();
             }
 
-            const nameElement =
-              row.children[1];
+            const nameElement = row.children[1];
 
             if (!nameElement) {
               return;
             }
-          
           });
         });
       });
 
-      const choices =
-        Array.isArray(
-          round?.choices
-        )
-          ? round.choices
-          : [];
+      const choices = Array.isArray(round?.choices) ? round.choices : [];
 
-          const duration =
-            Number(
-              round?.duration
-            ) ||
-            Number(
-              round?.roundDuration
-            ) ||
-            15;
+      const duration =
+        Number(round?.duration) || Number(round?.roundDuration) || 15;
 
-          const audioDuration =
-            Number(
-              round?.audioDuration
-            ) ||
-            Number(
-              round?.duration
-            ) ||
-            0;
+      const audioDuration =
+        Number(round?.audioDuration) || Number(round?.duration) || 0;
 
-          const startTime =
-            Number(
-              round?.startTime
-            ) || 0;
+      const startTime = Number(round?.startTime) || 0;
 
-          const startAt =
-            round?.startAt ??
-            null;
+      const startAt = round?.startAt ?? null;
 
-          setState((current) => ({
-            ...current,
-            inParty: true,
-            started: true,
-            finished: false,
-            roundNumber:
-              Number(
-                round?.roundNumber
-              ) ||
-              current.roundNumber + 1,
-            totalRounds:
-              Number(
-                round?.totalRounds
-              ) ||
-              current.totalRounds,
-            duration,
-            audioDuration,
-            startTime,
-            startAt,
-            choices,
-            answered: false,
-            selectedAnswerId:
-              null,
-            correctAnswerId:
-              null,
-            timeUp: false,
-            playing: false,
-            answerCorrect:
-              null
-          }));
+      setState((current) => ({
+        ...current,
+        inParty: true,
+        started: true,
+        finished: false,
+        roundNumber: Number(round?.roundNumber) || current.roundNumber + 1,
+        totalRounds: Number(round?.totalRounds) || current.totalRounds,
+        duration,
+        audioDuration,
+        startTime,
+        startAt,
+        choices,
+        answered: false,
+        selectedAnswerId: null,
+        correctAnswerId: null,
+        timeUp: false,
+        playing: false,
+        answerCorrect: null,
+      }));
 
-          setRoundResults([]);
+      setRoundResults([]);
 
-          if (
-            roundProgressRef.current
-          ) {
-            roundProgressRef.current.style.width =
-              "100%";
+      if (roundProgressRef.current) {
+        roundProgressRef.current.style.width = "100%";
 
-            roundProgressRef.current.classList.remove(
-              "timer-green",
-              "timer-orange",
-              "timer-red"
-            );
-          }
+        roundProgressRef.current.classList.remove(
+          "timer-green",
+          "timer-orange",
+          "timer-red",
+        );
+      }
 
-          if (
-            multiProgressRef.current
-          ) {
-            multiProgressRef.current.style.width =
-              "0%";
-          }
+      if (multiProgressRef.current) {
+        multiProgressRef.current.style.width = "0%";
+      }
 
-          onGameActiveChange?.(
-            true
-          );
+      onGameActiveChange?.(true);
 
-          startAnswerTimer();
+      startAnswerTimer();
 
-          const audio =
-            audioRef.current;
+      const audio = audioRef.current;
 
-          if (
-            !audio ||
-            !round?.audioUrl
-          ) {
+      if (!audio || !round?.audioUrl) {
+        return;
+      }
+
+      audio.pause();
+
+      try {
+        audio.currentTime = 0;
+      } catch (error) {
+        console.warn(error);
+      }
+
+      audio.src = round.audioUrl;
+
+      audio.load();
+
+      let hasStarted = false;
+
+      const playWhenReady = async () => {
+        if (hasStarted) {
+          return;
+        }
+
+        hasStarted = true;
+
+        try {
+          const target = round?.startAt
+            ? new Date(round.startAt).getTime()
+            : Date.now();
+
+          const remaining = target - Date.now();
+
+          if (remaining > 0) {
+            hasStarted = false;
+
+            countdownTimerRef.current = setTimeout(playWhenReady, remaining);
+
             return;
           }
 
-          audio.pause();
+          audio.currentTime = startTime;
 
-          try {
-            audio.currentTime = 0;
-          } catch (error) {
-            console.warn(error);
+          await audio.play();
+
+          setState((current) => ({
+            ...current,
+            playing: true,
+          }));
+
+          updateAudioProgress(startTime, audioDuration);
+
+          if (audioDuration > 0) {
+            clipTimerRef.current = setTimeout(() => {
+              stopMultiAudio();
+            }, audioDuration * 1000);
           }
+        } catch (error) {
+          hasStarted = false;
 
-          audio.src =
-            round.audioUrl;
+          console.error("Multiplayer audio playback failed:", error);
+        }
+      };
 
-          audio.load();
+      const handleReady = () => {
+        audio.removeEventListener("canplay", handleReady);
 
-          let hasStarted = false;
+        playWhenReady();
+      };
 
-          const playWhenReady =
-            async () => {
-              if (hasStarted) {
-                return;
-              }
+      if (audio.readyState >= 3) {
+        playWhenReady();
+      } else {
+        audio.addEventListener("canplay", handleReady);
+      }
+    },
+    [
+      clearTimers,
+      onGameActiveChange,
+      startAnswerTimer,
+      stopMultiAudio,
+      updateAudioProgress,
+    ],
+  );
 
-              hasStarted = true;
-
-              try {
-                const target =
-                  round?.startAt
-                    ? new Date(
-                        round.startAt
-                      ).getTime()
-                    : Date.now();
-
-                const remaining =
-                  target -
-                  Date.now();
-
-                if (
-                  remaining > 0
-                ) {
-                  hasStarted = false;
-
-                  countdownTimerRef.current =
-                    setTimeout(
-                      playWhenReady,
-                      remaining
-                    );
-
-                  return;
-                }
-
-                audio.currentTime =
-                  startTime;
-
-                await audio.play();
-
-                setState(
-                  (current) => ({
-                    ...current,
-                    playing: true
-                  })
-                );
-
-                updateAudioProgress(
-                  startTime,
-                  audioDuration
-                );
-
-                if (
-                  audioDuration >
-                  0
-                ) {
-                  clipTimerRef.current =
-                    setTimeout(
-                      () => {
-                        stopMultiAudio();
-                      },
-                      audioDuration *
-                        1000
-                    );
-                }
-              } catch (error) {
-                hasStarted = false;
-
-                console.error(
-                  "Multiplayer audio playback failed:",
-                  error
-                );
-              }
-            };
-
-          const handleReady =
-            () => {
-              audio.removeEventListener(
-                "canplay",
-                handleReady
-              );
-
-              playWhenReady();
-            };
-
-          if (
-            audio.readyState >= 3
-          ) {
-            playWhenReady();
-          } else {
-            audio.addEventListener(
-              "canplay",
-              handleReady
-            );
-          }
-        },
-        [
-          clearTimers,
-          onGameActiveChange,
-          startAnswerTimer,
-          stopMultiAudio,
-          updateAudioProgress
-        ]
-      );
-
-    const finishRound =
-  useCallback(
+  const finishRound = useCallback(
     (data) => {
       clearTimers();
       stopMultiAudio();
 
-      const correctAnswerId =
-        data?.answerId ?? null;
+      const correctAnswerId = data?.answerId ?? null;
 
-      const results =
-        Array.isArray(
-          data?.results
-        )
-          ? data.results
-          : [];
+      const results = Array.isArray(data?.results) ? data.results : [];
 
-      const players =
-        Array.isArray(
-          data?.players
-        )
-          ? data.players
-          : [];
+      const players = Array.isArray(data?.players) ? data.players : [];
 
-      setRoundResults(
-        results
-      );
+      setRoundResults(results);
 
       setState((current) => ({
         ...current,
@@ -1244,7 +799,7 @@ const Multiplayer = forwardRef(
         answered: true,
         playing: false,
         correctAnswerId,
-        players
+        players,
       }));
 
       /*
@@ -1253,1096 +808,635 @@ const Multiplayer = forwardRef(
        * instead of remaining in the waiting/dots state.
        */
       requestAnimationFrame(() => {
-        const container =
-          scoreboardRowsRef.current;
+        const container = scoreboardRowsRef.current;
 
         if (!container) {
           return;
         }
 
-        const rows =
-          container.querySelectorAll(
-            ".score-row"
-          );
+        const rows = container.querySelectorAll(".score-row");
 
         rows.forEach((row) => {
-          const playerId =
-            row.dataset.playerId;
+          const playerId = row.dataset.playerId;
 
           if (!playerId) {
             return;
           }
 
-          const scoreChange =
-            roundScoresRef.current.get(
-              String(playerId)
-            );
+          const scoreChange = roundScoresRef.current.get(String(playerId));
 
           /*
            * No answer received for this player.
            * Show ✕ instead of waiting dots.
            */
-          if (
-            scoreChange === undefined
-          ) {
-            row.classList.remove(
-              "score-waiting",
-              "finished"
-            );
+          if (scoreChange === undefined) {
+            row.classList.remove("score-waiting", "finished");
 
-            row.classList.add(
-              "incorrect"
-            );
+            row.classList.add("incorrect");
           }
         });
       });
     },
-    [
-      clearTimers,
-      stopMultiAudio
-    ]
+    [clearTimers, stopMultiAudio],
   );
 
-    const renderFinal =
-      useCallback(
-        (players) => {
-          const sorted =
-            Array.isArray(
-              players
-            )
-              ? [...players].sort(
-                  (a, b) =>
-                    getPlayerScore(
-                      b
-                    ) -
-                    getPlayerScore(
-                      a
-                    )
-                )
-              : [];
-
-          setFinalPlayers(
-            sorted
-          );
-
-          const winningPlayer =
-            sorted[0] ||
-            null;
-
-          setWinner(
-            winningPlayer
-          );
-
-          const winnerId =
-            getPlayerId(
-              winningPlayer
-            );
-
-          if (
-            winnerId !== null &&
-            String(
-              winnerId
-            ) ===
-              String(
-                socket.id
-              )
-          ) {
-            setWinnerMessage(
-              "You win! 🎉"
-            );
-
-            confetti();
-
-            setTimeout(
-              () => {
-                confetti();
-              },
-              700
-            );
-
-            setTimeout(
-              () => {
-                confetti();
-              },
-              1400
-            );
-          } else {
-            setWinnerMessage(
-              ""
-            );
-          }
-
-          setState((current) => ({
-            ...current,
-            finished: true,
-            started: false
-          }));
-
-          onGameActiveChange?.(
-            false
-          );
-        },
-        [onGameActiveChange]
-      );
-
-
-const renderScoreboard =
-  useCallback(
+  const renderFinal = useCallback(
     (players) => {
-      if (!Array.isArray(players)) {
-        return;
-      }
+      const sorted = Array.isArray(players)
+        ? [...players].sort((a, b) => getPlayerScore(b) - getPlayerScore(a))
+        : [];
 
-      const sorted =
-        [...players].sort(
-          (a, b) =>
-            getPlayerScore(b) -
-            getPlayerScore(a)
-        );
+      setFinalPlayers(sorted);
+
+      const winningPlayer = sorted[0] || null;
+
+      setWinner(winningPlayer);
+
+      const winnerId = getPlayerId(winningPlayer);
+
+      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+        setWinnerMessage("You win! 🎉");
+
+        confetti();
+
+        setTimeout(() => {
+          confetti();
+        }, 700);
+
+        setTimeout(() => {
+          confetti();
+        }, 1400);
+      } else {
+        setWinnerMessage("");
+      }
 
       setState((current) => ({
         ...current,
-        players: sorted
+        finished: true,
+        started: false,
       }));
 
-      requestAnimationFrame(() => {
-        const container =
-          scoreboardRowsRef.current;
+      onGameActiveChange?.(false);
+    },
+    [onGameActiveChange],
+  );
 
-        if (!container) {
+  const renderScoreboard = useCallback((players) => {
+    if (!Array.isArray(players)) {
+      return;
+    }
+
+    const sorted = [...players].sort(
+      (a, b) => getPlayerScore(b) - getPlayerScore(a),
+    );
+
+    setState((current) => ({
+      ...current,
+      players: sorted,
+    }));
+
+    requestAnimationFrame(() => {
+      const container = scoreboardRowsRef.current;
+
+      if (!container) {
+        return;
+      }
+
+      const rows = container.querySelectorAll(".score-row");
+
+      rows.forEach((row) => {
+        const playerId = row.dataset.playerId;
+
+        if (!playerId) {
           return;
         }
 
-        const rows =
-          container.querySelectorAll(
-            ".score-row"
-          );
+        const scoreChange = roundScoresRef.current.get(String(playerId));
 
-        rows.forEach((row) => {
-          const playerId =
-            row.dataset.playerId;
+        /*
+         * Player has not answered yet.
+         */
+        if (scoreChange === undefined) {
+          row.classList.add("score-waiting");
 
-          if (!playerId) {
-            return;
-          }
+          row.classList.remove("finished", "incorrect");
 
-          const scoreChange =
-              roundScoresRef.current.get(
-                String(playerId)
-              );
+          return;
+        }
 
-            /*
-            * Player has not answered yet.
-            */
-            if (scoreChange === undefined) {
-              row.classList.add(
-                "score-waiting"
-              );
+        /*
+         * Player has answered.
+         */
+        row.classList.remove("score-waiting");
 
-              row.classList.remove(
-                "finished",
-                "incorrect"
-              );
+        /*
+         * Correct answer.
+         */
+        if (scoreChange > 0) {
+          row.classList.add("finished");
 
-              return;
-            }
+          row.classList.remove("incorrect");
+        } else {
 
-            /*
-            * Player has answered.
-            */
-            row.classList.remove(
-              "score-waiting"
-            );
+        /*
+         * Incorrect or too late.
+         */
+          row.classList.add("incorrect");
 
-            /*
-            * Correct answer.
-            */
-            if (scoreChange > 0) {
-              row.classList.add(
-                "finished"
-              );
+          row.classList.remove("finished");
+        }
 
-              row.classList.remove(
-                "incorrect"
-              );
-            }
+        /*
+         * Play the score animation
+         * only when points were awarded.
+         */
+        if (scoreChange > 0) {
+          row.classList.remove("score-changed");
 
-            /*
-            * Incorrect or too late.
-            */
-            else {
-              row.classList.add(
-                "incorrect"
-              );
+          void row.offsetWidth;
 
-              row.classList.remove(
-                "finished"
-              );
-            }
+          row.classList.add("score-changed");
 
           /*
-           * Play the score animation
-           * only when points were awarded.
+           * Remove any existing
+           * score popup.
            */
-          if (scoreChange > 0) {
-            row.classList.remove(
-              "score-changed"
-            );
+          const oldPoints = row.querySelector(".round-score-animation");
 
-            void row.offsetWidth;
-
-            row.classList.add(
-              "score-changed"
-            );
-
-            /*
-             * Remove any existing
-             * score popup.
-             */
-            const oldPoints =
-              row.querySelector(
-                ".round-score-animation"
-              );
-
-            if (oldPoints) {
-              oldPoints.remove();
-            }
-
-            /*
-             * Create the +points popup.
-             */
-            const points =
-              document.createElement(
-                "span"
-              );
-
-            points.className =
-              "round-score-animation";
-
-            points.textContent =
-              `+${scoreChange}`;
-
-            row.appendChild(
-              points
-            );
-
-            setTimeout(() => {
-              points.remove();
-            }, 1200);
+          if (oldPoints) {
+            oldPoints.remove();
           }
-        });
+
+          /*
+           * Create the +points popup.
+           */
+          const points = document.createElement("span");
+
+          points.className = "round-score-animation";
+
+          points.textContent = `+${scoreChange}`;
+
+          row.appendChild(points);
+
+          setTimeout(() => {
+            points.remove();
+          }, 1200);
+        }
       });
-    },
-    []
+    });
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      endGame: leaveParty,
+    }),
+    [leaveParty],
   );
 
+  useEffect(() => {
+    socket.connect();
 
+    return () => {
+      cleanupMultiplayer();
+    };
+  }, [cleanupMultiplayer]);
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        endGame:
-          leaveParty
-      }),
-      [leaveParty]
-    );
+  useEffect(() => {
+    const handlePartyCreated = (data) => {
+      applyParty(data?.party || data);
+    };
 
-    useEffect(() => {
-      socket.connect();
+    const handlePartyJoined = (data) => {
+      applyParty(data?.party || data);
+    };
 
-      return () => {
-        cleanupMultiplayer();
-      };
-    }, [
-      cleanupMultiplayer
-    ]);
+    const handlePartyUpdated = (data) => {
+      applyParty(data?.party || data);
 
-    useEffect(() => {
-      const handlePartyCreated =
-        (data) => {
-          applyParty(
-            data?.party ||
-              data
-          );
-        };
+      const players =
+        data?.players ||
+        data?.party?.players ||
+        data?.playerList ||
+        data?.party?.playerList;
 
-      const handlePartyJoined =
-        (data) => {
-          applyParty(
-            data?.party ||
-              data
-          );
-        };
+      if (Array.isArray(players)) {
+        renderScoreboard(players);
+      }
+    };
 
-      const handlePartyUpdated =
-        (data) => {
-          applyParty(
-            data?.party ||
-              data
-          );
+    const handleHostChanged = (data) => {
+      const hostId = data?.hostId ?? data?.id ?? null;
 
-          const players =
-            data?.players ||
-            data?.party?.players ||
-            data?.playerList ||
-            data?.party?.playerList;
+      setState((current) => ({
+        ...current,
+        hostId,
+        isHost: String(hostId) === String(socket.id),
+      }));
+    };
 
-          if (
-            Array.isArray(
-              players
-            )
-          ) {
-            renderScoreboard(
-              players
-            );
-          }
-        };
+    const handleRoundStarted = (round) => {
+      startRound(round);
+    };
 
-      const handleHostChanged =
-        (data) => {
-          const hostId =
-            data?.hostId ??
-            data?.id ??
-            null;
+    const handleAnswerAccepted = (data) => {
+      console.log("ANSWER ACCEPTED RECEIVED", data);
+      if (data?.playerId !== undefined) {
+        const playerId = String(data.playerId);
 
-          setState((current) => ({
-            ...current,
-            hostId,
-            isHost:
-              String(
-                hostId
-              ) ===
-              String(
-                socket.id
-              )
-          }));
-        };
+        const points = Number(data.points) || 0;
 
-      const handleRoundStarted =
-        (round) => {
-          startRound(
-            round
-          );
-        };
+        roundScoresRef.current.set(playerId, points);
 
-      const handleAnswerAccepted =
-  (data) => {
+        setState((current) => ({
+          ...current,
+        }));
 
-    console.log(
-      "ANSWER ACCEPTED RECEIVED",
-      data
-    );
-    if (
-      data?.playerId !==
-      undefined
-    ) {
-      const playerId =
-        String(
-          data.playerId
-        );
+        /*
+         * Update the scoreboard immediately.
+         *
+         * 0 points = incorrect /
+         * too late → ✕
+         *
+         * > 0 points = correct → ✓
+         */
+        renderScoreboard(stateRef.current.players);
+      }
 
-      const points =
-        Number(
-          data.points
-        ) || 0;
-
-      roundScoresRef.current.set(
-        playerId,
-        points
-      );
-
-      setState(
-        (current) => ({
-          ...current
-        })
-      );
-
-      /*
-       * Update the scoreboard immediately.
-       *
-       * 0 points = incorrect /
-       * too late → ✕
-       *
-       * > 0 points = correct → ✓
-       */
-      renderScoreboard(
-        stateRef.current.players
-      );
-    }
-
-    if (
-      data?.correct !==
-      undefined
-    ) {
-      setState(
-        (current) => ({
+      if (data?.correct !== undefined) {
+        setState((current) => ({
           ...current,
           answerCorrect:
-            String(
-              data.playerId
-            ) ===
-            String(
-              socket.id
-            )
-              ? Boolean(
-                  data.correct
-                )
-              : current.answerCorrect
-        })
+            String(data.playerId) === String(socket.id)
+              ? Boolean(data.correct)
+              : current.answerCorrect,
+        }));
+      }
+    };
+
+    const handleRoundFinished = (data) => {
+      finishRound(data);
+    };
+
+    const handleGameFinished = (data) => {
+      clearTimers();
+
+      stopMultiAudio();
+
+      const players = data?.players || data?.scoreboard || data?.results || [];
+
+      renderFinal(players);
+    };
+
+    const handleNewGameStarted = (data) => {
+      setRoundResults([]);
+      setFinalPlayers([]);
+      setWinner(null);
+      setWinnerMessage("");
+
+      setState((current) => ({
+        ...current,
+        finished: false,
+        started: false,
+        answered: false,
+        selectedAnswerId: null,
+        correctAnswerId: null,
+        timeUp: false,
+        playing: false,
+        answerCorrect: null,
+      }));
+
+      applyParty(data?.party || data);
+    };
+
+    const handlePartyError = (data) => {
+      setSetupError(
+        typeof data === "string" ? data : data?.message || "Party error.",
       );
-    }
-  };
+    };
 
-      const handleRoundFinished =
-        (data) => {
-          finishRound(
-            data
-          );
-        };
-
-      const handleGameFinished =
-        (data) => {
-          clearTimers();
-
-          stopMultiAudio();
-
-          const players =
-            data?.players ||
-            data?.scoreboard ||
-            data?.results ||
-            [];
-
-          renderFinal(
-            players
-          );
-        };
-
-      const handleNewGameStarted =
-        (data) => {
-          setRoundResults([]);
-          setFinalPlayers([]);
-          setWinner(null);
-          setWinnerMessage("");
-
-          setState((current) => ({
-            ...current,
-            finished: false,
-            started: false,
-            answered: false,
-            selectedAnswerId:
-              null,
-            correctAnswerId:
-              null,
-            timeUp: false,
-            playing: false,
-            answerCorrect:
-              null
-          }));
-
-          applyParty(
-            data?.party ||
-              data
-          );
-        };
-
-      const handlePartyError =
-        (data) => {
-          setSetupError(
-            typeof data ===
-              "string"
-              ? data
-              : data?.message ||
-                  "Party error."
-          );
-        };
-
-      const handleErrorMessage =
-        (data) => {
-          setSetupError(
-            typeof data ===
-              "string"
-              ? data
-              : data?.message ||
-                  "Something went wrong."
-          );
-        };
-
-      socket.on(
-        "partyCreated",
-        handlePartyCreated
+    const handleErrorMessage = (data) => {
+      setSetupError(
+        typeof data === "string"
+          ? data
+          : data?.message || "Something went wrong.",
       );
+    };
 
-      socket.on(
-        "partyJoined",
-        handlePartyJoined
-      );
+    socket.on("partyCreated", handlePartyCreated);
 
-      socket.on(
-        "partyUpdated",
-        handlePartyUpdated
-      );
+    socket.on("partyJoined", handlePartyJoined);
 
-      socket.on(
-        "hostChanged",
-        handleHostChanged
-      );
+    socket.on("partyUpdated", handlePartyUpdated);
 
-      socket.on(
-        "roundStarted",
-        handleRoundStarted
-      );
+    socket.on("hostChanged", handleHostChanged);
 
-      socket.on(
-        "answerAccepted",
-        handleAnswerAccepted
-      );
+    socket.on("roundStarted", handleRoundStarted);
 
-      socket.on(
-        "roundFinished",
-        handleRoundFinished
-      );
+    socket.on("answerAccepted", handleAnswerAccepted);
 
-      socket.on(
-        "gameFinished",
-        handleGameFinished
-      );
+    socket.on("roundFinished", handleRoundFinished);
 
-      socket.on(
-        "newGameStarted",
-        handleNewGameStarted
-      );
+    socket.on("gameFinished", handleGameFinished);
 
-      socket.on(
-        "partyError",
-        handlePartyError
-      );
+    socket.on("newGameStarted", handleNewGameStarted);
 
-      socket.on(
-        "errorMessage",
-        handleErrorMessage
-      );
+    socket.on("partyError", handlePartyError);
 
-      return () => {
-        socket.off(
-          "partyCreated",
-          handlePartyCreated
-        );
+    socket.on("errorMessage", handleErrorMessage);
 
-        socket.off(
-          "partyJoined",
-          handlePartyJoined
-        );
+    return () => {
+      socket.off("partyCreated", handlePartyCreated);
 
-        socket.off(
-          "partyUpdated",
-          handlePartyUpdated
-        );
+      socket.off("partyJoined", handlePartyJoined);
 
-        socket.off(
-          "hostChanged",
-          handleHostChanged
-        );
+      socket.off("partyUpdated", handlePartyUpdated);
 
-        socket.off(
-          "roundStarted",
-          handleRoundStarted
-        );
+      socket.off("hostChanged", handleHostChanged);
 
-        socket.off(
-          "answerAccepted",
-          handleAnswerAccepted
-        );
+      socket.off("roundStarted", handleRoundStarted);
 
-        socket.off(
-          "roundFinished",
-          handleRoundFinished
-        );
+      socket.off("answerAccepted", handleAnswerAccepted);
 
-        socket.off(
-          "gameFinished",
-          handleGameFinished
-        );
+      socket.off("roundFinished", handleRoundFinished);
 
-        socket.off(
-          "newGameStarted",
-          handleNewGameStarted
-        );
+      socket.off("gameFinished", handleGameFinished);
 
-        socket.off(
-          "partyError",
-          handlePartyError
-        );
+      socket.off("newGameStarted", handleNewGameStarted);
 
-        socket.off(
-          "errorMessage",
-          handleErrorMessage
-        );
-      };
-    }, [
-      applyParty,
-      clearTimers,
-      finishRound,
-      renderFinal,
-      renderScoreboard,
-      startRound,
-      stopMultiAudio
-    ]);
+      socket.off("partyError", handlePartyError);
 
-    const isFinal =
-      state.finished;
+      socket.off("errorMessage", handleErrorMessage);
+    };
+  }, [
+    applyParty,
+    clearTimers,
+    finishRound,
+    renderFinal,
+    renderScoreboard,
+    startRound,
+    stopMultiAudio,
+  ]);
 
-    return (
-      <section id="multiplayer">
+  const isFinal = state.finished;
 
-        {!state.inParty && (
-          <section
-            id="multiSetup"
-            className="card"
-          >
-            <h2>
-              Multiplayer
-            </h2>
+  return (
+    <section id="multiplayer">
+      {!state.inParty && (
+        <section id="multiSetup" className="card">
+          <h2>Multiplayer</h2>
 
-            <div className="multi-actions">
+          <div className="multi-actions">
+            <div className="multi-box">
+              <h3>Create a party</h3>
 
-              <div className="multi-box">
-                <h3>
-                  Create a party
-                </h3>
+              <input
+                id="createName"
+                type="text"
+                placeholder="Your name"
+                value={createName}
+                onChange={(event) => setCreateName(event.target.value)}
+                maxLength={20}
+              />
 
-                <input
-                  id="createName"
-                  type="text"
-                  placeholder="Your name"
-                  value={
-                    createName
-                  }
-                  onChange={(event) =>
-                    setCreateName(
-                      event.target.value
-                    )
-                  }
-                  maxLength={20}
-                />
+              <select
+                id="roundCount"
+                className="multi-select"
+                value={roundCount}
+                onChange={(event) => setRoundCount(event.target.value)}
+              >
+                <option value="5">5 rounds</option>
 
-                <select
-                  id="roundCount"
-                  className="multi-select"
-                  value={
-                    roundCount
-                  }
-                  onChange={(event) =>
-                    setRoundCount(
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="5">
-                    5 rounds
-                  </option>
+                <option value="10">10 rounds</option>
 
-                  <option value="10">
-                    10 rounds
-                  </option>
+                <option value="15">15 rounds</option>
 
-                  <option value="15">
-                    15 rounds
-                  </option>
+                <option value="20">20 rounds</option>
+              </select>
 
-                  <option value="20">
-                    20 rounds
-                  </option>
-                </select>
-
-                <button
-                  id="createPartyBtn"
-                  className="primary"
-                  type="button"
-                  onClick={
-                    createParty
-                  }
-                >
-                  Create party
-                </button>
-              </div>
-
-              <div className="multi-divider">
-                or
-              </div>
-
-              <div className="multi-box">
-                <h3>
-                  Join a party
-                </h3>
-
-                <input
-                  id="joinName"
-                  type="text"
-                  placeholder="Your name"
-                  value={
-                    joinName
-                  }
-                  onChange={(event) =>
-                    setJoinName(
-                      event.target.value
-                    )
-                  }
-                  maxLength={20}
-                />
-
-                <input
-                  id="partyCodeInput"
-                  type="text"
-                  placeholder="Party code"
-                  value={
-                    partyCodeInput
-                  }
-                  onChange={(event) =>
-                    setPartyCodeInput(
-                      event.target.value
-                        .toUpperCase()
-                    )
-                  }
-                  maxLength={6}
-                />
-
-                <button
-                  id="joinPartyBtn"
-                  className="primary"
-                  type="button"
-                  onClick={
-                    joinParty
-                  }
-                >
-                  Join party
-                </button>
-              </div>
-
+              <button
+                id="createPartyBtn"
+                className="primary"
+                type="button"
+                onClick={createParty}
+              >
+                Create party
+              </button>
             </div>
 
-            <p
-              id="multiSetupError"
-              className="error"
-            >
-              {setupError}
-            </p>
-          </section>
+            <div className="multi-divider">or</div>
+
+            <div className="multi-box">
+              <h3>Join a party</h3>
+
+              <input
+                id="joinName"
+                type="text"
+                placeholder="Your name"
+                value={joinName}
+                onChange={(event) => setJoinName(event.target.value)}
+                maxLength={20}
+              />
+
+              <input
+                id="partyCodeInput"
+                type="text"
+                placeholder="Party code"
+                value={partyCodeInput}
+                onChange={(event) =>
+                  setPartyCodeInput(event.target.value.toUpperCase())
+                }
+                maxLength={6}
+              />
+
+              <button
+                id="joinPartyBtn"
+                className="primary"
+                type="button"
+                onClick={joinParty}
+              >
+                Join party
+              </button>
+            </div>
+          </div>
+
+          <p id="multiSetupError" className="error">
+            {setupError}
+          </p>
+        </section>
+      )}
+
+      {state.inParty &&
+        !state.started &&
+        !isFinal &&
+        state.roundNumber === 0 && (
+          <Lobby
+            partyCode={state.partyCode}
+            totalRounds={state.totalRounds}
+            players={state.players}
+            hostId={state.hostId}
+            isHost={state.isHost}
+            setupError={setupError}
+            onLeave={leaveParty}
+            onStart={startParty}
+          />
         )}
 
-        {state.inParty &&
-          !state.started &&
-          !isFinal &&
-          state.roundNumber === 0 && (
-            <Lobby
-              partyCode={
-                state.partyCode
-              }
-              totalRounds={
-                state.totalRounds
-              }
-              players={
-                state.players
-              }
-              hostId={
-                state.hostId
-              }
-              isHost={
-                state.isHost
-              }
-              setupError={
-                setupError
-              }
-              onLeave={
-                leaveParty
-              }
-              onStart={
-                startParty
-              }
-            />
-          )}
+      {state.started && (
+        <section id="multiGame">
+          <div className="multi-round-header">
+            <span>
+              Round {state.roundNumber} / {state.totalRounds}
+            </span>
+          </div>
 
-        {state.started && (
-          <section id="multiGame">
+          <div className="multi-round-progress">
+            <div ref={roundProgressRef} id="multiRoundProgress" />
+          </div>
 
-            <div className="multi-round-header">
-              <span>
-                Round {state.roundNumber} /{" "}
-                {state.totalRounds}
+          <div className="card game-card">
+            <div className="sound-icon">🔊</div>
+
+            <h2>Which video is this?</h2>
+
+            <p className="muted">Listen to the clip and choose the video.</p>
+
+            <audio ref={audioRef} id="multiAudio" />
+
+            <div className="player">
+              <button
+                id="multiPlayBtn"
+                className="play"
+                type="button"
+                onClick={() => {
+                  if (state.playing) {
+                    stopMultiAudio();
+                  } else {
+                    playMultiClip();
+                  }
+                }}
+              >
+                {state.playing ? "❚❚" : "▶"}
+              </button>
+
+              <div className="bar">
+                <div ref={multiProgressRef} id="multiProgress" />
+              </div>
+
+              <span id="multiDuration">
+                {formatSeconds(state.audioDuration)}s
               </span>
             </div>
 
-            <div className="multi-round-progress">
-              <div
-                ref={
-                  roundProgressRef
+            <div id="multiChoices" className="multi-choices">
+              {state.choices.map((choice, index) => {
+                const choiceId = getChoiceId(choice);
+
+                const isSelected =
+                  state.selectedAnswerId !== null &&
+                  String(state.selectedAnswerId) === String(choiceId);
+
+                const isCorrectChoice =
+                  state.correctAnswerId !== null &&
+                  String(state.correctAnswerId) === String(choiceId);
+
+                const isImmediatelyCorrect =
+                  state.answerCorrect === true && isSelected;
+
+                const isWrongSelectedChoice =
+                  state.answerCorrect === false &&
+                  isSelected &&
+                  !isCorrectChoice;
+
+                let choiceClass = "choice-button";
+
+                if (isCorrectChoice || isImmediatelyCorrect) {
+                  choiceClass += " correct";
+                } else if (isWrongSelectedChoice) {
+                  choiceClass += " incorrect";
                 }
-                id="multiRoundProgress"
-              />
+
+                const isDisabled = state.answered;
+
+                return (
+                  <button
+                    key={String(choiceId ?? index)}
+                    type="button"
+                    className={choiceClass}
+                    disabled={isDisabled}
+                    onClick={() => submitMultiAnswer(choiceId)}
+                  >
+                    <span className="choice-number">{index + 1}</span>
+
+                    <span className="choice-title">
+                      {getChoiceTitle(choice)}
+                    </span>
+
+                    {isSelected && state.answerCorrect !== null && (
+                      <span>{state.answerCorrect ? "✓" : "✕"}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            <div className="card game-card">
+          <Scoreboard
+            ref={scoreboardRowsRef}
+            players={state.players}
+            roundScores={roundScoresRef.current}
+          />
+        </section>
+      )}
 
-              <div className="sound-icon">
-                🔊
-              </div>
+      {isFinal && (
+        <section id="multiFinalResult" className="card game-card">
+          <h2>Game finished!</h2>
 
-              <h2>
-                Which video is this?
-              </h2>
+          {winnerMessage && (
+            <div className="winner-message">{winnerMessage}</div>
+          )}
 
-              <p className="muted">
-                Listen to the clip and
-                choose the video.
-              </p>
-
-              <audio
-                ref={audioRef}
-                id="multiAudio"
-              />
-
-              <div className="player">
-
-                <button
-                  id="multiPlayBtn"
-                  className="play"
-                  type="button"
-                  onClick={() => {
-                    if (
-                      state.playing
-                    ) {
-                      stopMultiAudio();
-                    } else {
-                      playMultiClip();
-                    }
-                  }}
-                >
-                  {state.playing
-                    ? "❚❚"
-                    : "▶"}
-                </button>
-
-                <div className="bar">
-                  <div
-                    ref={
-                      multiProgressRef
-                    }
-                    id="multiProgress"
-                  />
-                </div>
-
-                <span id="multiDuration">
-                  {formatSeconds(
-                    state.audioDuration
-                  )}
-                  s
-                </span>
-
-              </div>
-
+          <div id="finalScoreboard" className="scoreboard">
+            {finalPlayers.map((player, index) => (
               <div
-                id="multiChoices"
-                className="multi-choices"
+                className={`score-row ${index === 0 ? "leader" : ""}`}
+                key={String(getPlayerId(player) ?? index)}
               >
-                {state.choices.map(
-                  (
-                    choice,
-                    index
-                  ) => {
-                    const choiceId =
-                      getChoiceId(
-                        choice
-                      );
+                <span>{index + 1}</span>
 
-                    const isSelected =
-                      state.selectedAnswerId !==
-                        null &&
-                      String(
-                        state.selectedAnswerId
-                      ) ===
-                        String(
-                          choiceId
-                        );
+                <span>{getPlayerName(player)}</span>
 
-                    const isCorrectChoice =
-                      state.correctAnswerId !==
-                        null &&
-                      String(
-                        state.correctAnswerId
-                      ) ===
-                        String(
-                          choiceId
-                        );
-
-                    const isImmediatelyCorrect =
-                      state.answerCorrect ===
-                        true &&
-                      isSelected;
-
-                    const isWrongSelectedChoice =
-                      state.answerCorrect ===
-                        false &&
-                      isSelected &&
-                      !isCorrectChoice;
-
-                    let choiceClass =
-                      "choice-button";
-
-                    if (
-                      isCorrectChoice ||
-                      isImmediatelyCorrect
-                    ) {
-                      choiceClass +=
-                        " correct";
-                    } else if (
-                      isWrongSelectedChoice
-                    ) {
-                      choiceClass +=
-                        " incorrect";
-                    }
-
-                    const isDisabled =
-                      state.answered;
-
-                    return (
-                      <button
-                        key={String(
-                          choiceId ??
-                            index
-                        )}
-                        type="button"
-                        className={
-                          choiceClass
-                        }
-                        disabled={
-                          isDisabled
-                        }
-                        onClick={() =>
-                          submitMultiAnswer(
-                            choiceId
-                          )
-                        }
-                      >
-                        <span className="choice-number">
-                          {index + 1}
-                        </span>
-
-                        <span className="choice-title">
-                          {getChoiceTitle(
-                            choice
-                          )}
-                        </span>
-
-                        {isSelected &&
-                          state.answerCorrect !==
-                            null && (
-                            <span>
-                              {state.answerCorrect
-                                ? "✓"
-                                : "✕"}
-                            </span>
-                          )}
-                      </button>
-                    );
-                  }
-                )}
+                <strong>{getPlayerScore(player)}</strong>
               </div>
+            ))}
+          </div>
 
-            </div>
-
-            <Scoreboard
-              ref={scoreboardRowsRef}
-              players={state.players}
-              roundScores={roundScoresRef.current}
-            />
-
-          </section>
-        )}
-
-        {isFinal && (
-          <section
-            id="multiFinalResult"
-            className="card game-card"
-          >
-            <h2>
-              Game finished!
-            </h2>
-
-            {winnerMessage && (
-              <div className="winner-message">
-                {winnerMessage}
-              </div>
+          <div className="final-actions">
+            {state.isHost && (
+              <button
+                id="finalNewGameBtn"
+                className="primary"
+                type="button"
+                onClick={newGame}
+              >
+                New game
+              </button>
             )}
 
-            <div
-  id="finalScoreboard"
-  className="scoreboard"
->
-  {finalPlayers.map(
-    (
-      player,
-      index
-    ) => (
-      <div
-        className={`score-row ${
-          index === 0
-            ? "leader"
-            : ""
-        }`}
-        key={String(
-          getPlayerId(
-            player
-          ) ?? index
-        )}
-      >
-        <span>
-          {index + 1}
-        </span>
-
-        <span>
-          {getPlayerName(
-            player
-          )}
-        </span>
-
-        <strong>
-          {getPlayerScore(
-            player
-          )}
-        </strong>
-      </div>
-    )
-  )}
-</div>
-
-            <div className="final-actions">
-
-  {state.isHost && (
-    <button
-      id="finalNewGameBtn"
-      className="primary"
-      type="button"
-      onClick={newGame}
-    >
-      New game
-    </button>
-  )}
-
-  <button
-    id="finalLeaveBtn"
-    className="secondary"
-    type="button"
-    onClick={leaveParty}
-  >
-    Leave
-  </button>
-
-</div>
-          </section>
-        )}
-
-      </section>
-    );
-  }
-);
+            <button
+              id="finalLeaveBtn"
+              className="secondary"
+              type="button"
+              onClick={leaveParty}
+            >
+              Leave
+            </button>
+          </div>
+        </section>
+      )}
+    </section>
+  );
+});
 
 export default Multiplayer;

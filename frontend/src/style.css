@@ -18,13 +18,12 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(
-      circle at 50% -10%,
-      #293247 0,
-      #111621 32%,
-      #090b10 72%
-    );
+  background: radial-gradient(
+    circle at 50% -10%,
+    #293247 0,
+    #111621 32%,
+    #090b10 72%
+  );
   color: #f7f8fb;
 }
 
@@ -125,12 +124,11 @@ h2 {
 }
 
 .card {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(25, 30, 42, 0.96),
-      rgba(18, 22, 31, 0.96)
-    );
+  background: linear-gradient(
+    180deg,
+    rgba(25, 30, 42, 0.96),
+    rgba(18, 22, 31, 0.96)
+  );
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 24px;
   padding: 30px;
@@ -229,8 +227,7 @@ input,
 input:focus,
 .multi-select:focus {
   border-color: #68758d;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
 input::placeholder {
@@ -292,16 +289,10 @@ form .primary {
   place-items: center;
   margin: 0 auto 22px;
   border-radius: 50%;
-  background:
-    linear-gradient(
-      145deg,
-      #30394d,
-      #1d2432
-    );
+  background: linear-gradient(145deg, #30394d, #1d2432);
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 35px;
-  box-shadow:
-    0 15px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
 }
 
 .game-card h2 {
@@ -329,8 +320,7 @@ form .primary {
   background: #fff;
   color: #111;
   font-size: 19px;
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
 .play:hover {
@@ -388,8 +378,7 @@ form .primary {
   border: none;
   border-radius: 13px;
   overflow: hidden;
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
   text-align: left;
 }
 
@@ -405,8 +394,7 @@ form .primary {
   padding: 14px 16px;
   text-align: left;
   cursor: pointer;
-  border-bottom:
-    1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   transition: background 0.15s;
 }
 
@@ -460,7 +448,6 @@ form .primary {
   margin-top: 15px;
 }
 
-
 /* ==========================================================
    MULTIPLAYER SETUP
    ========================================================== */
@@ -508,7 +495,6 @@ form .primary {
   letter-spacing: 1px;
 }
 
-
 /* ==========================================================
    MULTIPLAYER LOBBY
    ========================================================== */
@@ -523,8 +509,7 @@ form .primary {
   justify-content: space-between;
   gap: 20px;
   padding-bottom: 22px;
-  border-bottom:
-    1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .lobby-header > div {
@@ -597,7 +582,6 @@ form .primary {
   height: 17px;
 }
 
-
 /* Players */
 
 .player-list {
@@ -627,11 +611,9 @@ form .primary {
 
 .player-row:hover {
   background: rgba(30, 36, 49, 0.8);
-  border-color:
-    rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.12);
   transform: translateY(-1px);
 }
-
 
 .player-row span {
   min-width: 0;
@@ -674,7 +656,6 @@ form .primary {
 #leavePartyBtn {
   flex-shrink: 0;
 }
-
 
 /* ==========================================================
    MULTIPLAYER GAME
@@ -732,8 +713,7 @@ form .primary {
   max-width: 900px;
   margin: 24px auto 0;
   display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   padding: 0;
 }
@@ -748,12 +728,7 @@ form .primary {
   min-height: 76px;
   padding: 15px 17px;
   -webkit-tap-highlight-color: transparent;
-  background:
-    linear-gradient(
-      145deg,
-      #1c2230,
-      #171c27
-    );
+  background: linear-gradient(145deg, #1c2230, #171c27);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
   border-radius: 15px;
@@ -777,14 +752,8 @@ form .primary {
 @media (hover: hover) and (pointer: fine) {
   .choice-button:hover {
     transform: translateY(-2px);
-    background:
-      linear-gradient(
-        145deg,
-        #282f40,
-        #202735
-      );
-    border-color:
-      rgba(255, 255, 255, 0.15);
+    background: linear-gradient(145deg, #282f40, #202735);
+    border-color: rgba(255, 255, 255, 0.15);
   }
 }
 
@@ -830,7 +799,6 @@ form .primary {
   white-space: nowrap;
 }
 
-
 /* ==========================================================
    ANSWER STATUS
    ========================================================== */
@@ -857,7 +825,6 @@ form .primary {
   background: #fff;
   color: #101218;
 }
-
 
 /* ==========================================================
    SCOREBOARD
@@ -895,12 +862,10 @@ form .primary {
   align-items: center;
   gap: 10px;
   padding: 12px 10px;
-  border-top:
-    1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   transition:
-    transform 0.65s
-      cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
     background 0.3s ease,
     box-shadow 0.3s ease;
   will-change: transform;
@@ -912,14 +877,8 @@ form .primary {
 }
 
 .score-row.leader {
-  background:
-    linear-gradient(
-      145deg,
-      #292438,
-      #211d30
-    );
-  box-shadow:
-    0 0 20px rgba(255, 215, 80, 0.16);
+  background: linear-gradient(145deg, #292438, #211d30);
+  box-shadow: 0 0 20px rgba(255, 215, 80, 0.16);
   padding: 20px 50px;
 }
 
@@ -928,7 +887,7 @@ form .primary {
   font-size: 1.15em;
 }
 
-.score-row.leader > span:nth-child(2){
+.score-row.leader > span:nth-child(2) {
   font-size: 1.15em;
   font-weight: bold;
 }
@@ -974,14 +933,12 @@ form .primary {
 
   padding: 12px 10px;
 
-  border-top:
-    1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 
   border-radius: 12px;
 
   transition:
-    transform 0.65s
-      cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
     background 0.3s ease,
     box-shadow 0.3s ease;
 
@@ -1001,37 +958,17 @@ form .primary {
   transform: translateY(-50%);
 
   background:
-    radial-gradient(
-      circle,
-      #7f8b9f 2px,
-      transparent 2.5px
-    )
-    0 50% / 6px 6px no-repeat,
+    radial-gradient(circle, #7f8b9f 2px, transparent 2.5px) 0 50% / 6px 6px
+      no-repeat,
+    radial-gradient(circle, #7f8b9f 2px, transparent 2.5px) 9px 50% / 6px 6px
+      no-repeat,
+    radial-gradient(circle, #7f8b9f 2px, transparent 2.5px) 18px 50% / 6px 6px
+      no-repeat;
 
-    radial-gradient(
-      circle,
-      #7f8b9f 2px,
-      transparent 2.5px
-    )
-    9px 50% / 6px 6px no-repeat,
-
-    radial-gradient(
-      circle,
-      #7f8b9f 2px,
-      transparent 2.5px
-    )
-    18px 50% / 6px 6px no-repeat;
-
-  animation:
-    scoreDots
-    1.2s
-    ease-in-out
-    infinite;
+  animation: scoreDots 1.2s ease-in-out infinite;
 
   pointer-events: none;
 }
-
-
 
 .score-row.finished::after {
   content: "✓";
@@ -1064,7 +1001,6 @@ form .primary {
 
   pointer-events: none;
 }
-
 
 .score-row.leader.score-waiting::after {
   right: 50px;
@@ -1143,42 +1079,29 @@ form .primary {
   white-space: nowrap;
   pointer-events: none;
 
-  animation:
-    round-score-float
-    3.1s
-    ease-out
-    forwards;
+  animation: round-score-float 3.1s ease-out forwards;
 }
 
 @keyframes round-score-float {
   0% {
     opacity: 0;
-    transform:
-      translateY(8px)
-      scale(0.7);
+    transform: translateY(8px) scale(0.7);
   }
 
   15% {
     opacity: 1;
-    transform:
-      translateY(0)
-      scale(1.1);
+    transform: translateY(0) scale(1.1);
   }
 
   35% {
-    transform:
-      translateY(0)
-      scale(1);
+    transform: translateY(0) scale(1);
   }
 
   100% {
     opacity: 0;
-    transform:
-      translateY(-20px)
-      scale(1);
+    transform: translateY(-20px) scale(1);
   }
 }
-
 
 /* ==========================================================
    ROUND RESULTS
@@ -1195,10 +1118,8 @@ form .primary {
   justify-content: space-between;
   gap: 20px;
   padding: 10px 2px;
-  border-top:
-    1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
-
 
 /* ==========================================================
    FINAL SCREEN
@@ -1230,7 +1151,6 @@ form .primary {
   justify-content: center;
 }
 
-
 /* ==========================================================
    ADMIN / LIBRARY
    ========================================================== */
@@ -1247,8 +1167,7 @@ form .primary {
   align-items: center;
   gap: 20px;
   padding: 16px 0;
-  border-top:
-    1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .video-row strong,
@@ -1276,14 +1195,12 @@ form .primary {
 
 #url:focus {
   border-color: #68758d;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
 #url::placeholder {
   color: #69758b;
 }
-
 
 /* ==========================================================
    DISABLED ANSWERS
@@ -1308,7 +1225,6 @@ form .primary {
 .choice-button.disabled.incorrect {
   opacity: 1 !important;
 }
-
 
 /* ==========================================================
    MOBILE
@@ -1364,7 +1280,6 @@ form .primary {
     font-size: 18px;
   }
 
-
   /* Multiplayer setup becomes vertical only on mobile */
 
   .multi-actions {
@@ -1375,7 +1290,6 @@ form .primary {
   .multi-divider {
     height: 15px;
   }
-
 
   /* Lobby */
 
@@ -1446,7 +1360,6 @@ form .primary {
     line-height: 1.3;
   }
 }
-
 
 /* ==========================================================
    VERY SMALL SCREENS
