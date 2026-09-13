@@ -127,44 +127,26 @@ const Multiplayer = forwardRef(function Multiplayer(
   const [state, setState] = useState(INITIAL_STATE);
 
   const [createName, setCreateName] = useState("");
-
   const [joinName, setJoinName] = useState("");
-
   const [partyCodeInput, setPartyCodeInput] = useState("");
-
   const [roundCount, setRoundCount] = useState("10");
-
   const [setupError, setSetupError] = useState("");
 
   const [roundResults, setRoundResults] = useState([]);
-
   const [finalPlayers, setFinalPlayers] = useState([]);
-
   const [winner, setWinner] = useState(null);
-
   const [winnerMessage, setWinnerMessage] = useState("");
 
-  /*
-   * Changes only after the normal round -> total
-   * animation has finished.
-   *
-   * Scoreboard uses this to start the ranking
-   * movement animation.
-   */
   const [animatePositions, setAnimatePositions] = useState(0);
-
   const [freezeRanking, setFreezeRanking] = useState(false);
 
   const audioRef = useRef(null);
 
   const multiProgressRef = useRef(null);
-
   const roundProgressRef = useRef(null);
 
   const clipTimerRef = useRef(null);
-
   const countdownTimerRef = useRef(null);
-
   const timerRef = useRef(null);
 
   const progressAnimationRef = useRef(null);
@@ -174,14 +156,19 @@ const Multiplayer = forwardRef(function Multiplayer(
   const scoreboardRowsRef = useRef(null);
 
   const previousScoresRef = useRef(new Map());
-
   const roundScoresRef = useRef(new Map());
-
   const displayedTotalsRef = useRef(new Map());
 
   const scoreTransitionStartRef = useRef(null);
-
   const scoreTransitionEndRef = useRef(null);
+
+  /*
+   * Every new round gets a new audio generation.
+   *
+   * This prevents an old canplay event / timeout / async play()
+   * from starting audio after the round has already changed.
+   */
+  const audioGenerationRef = useRef(0);
 
   useEffect(() => {
     stateRef.current = state;
@@ -208,11 +195,18 @@ const Multiplayer = forwardRef(function Multiplayer(
   }, []);
 
   const stopMultiAudio = useCallback(() => {
+    /*
+     * Invalidate every pending audio startup from the current round.
+     */
+    audioGenerationRef.current += 1;
+
     clearTimeout(clipTimerRef.current);
+    clearTimeout(countdownTimerRef.current);
 
     cancelAnimationFrame(progressAnimationRef.current);
 
     clipTimerRef.current = null;
+    countdownTimerRef.current = null;
     progressAnimationRef.current = null;
 
     const audio = audioRef.current;
@@ -252,6 +246,8 @@ const Multiplayer = forwardRef(function Multiplayer(
   const resetState = useCallback(() => {
     clearTimers();
 
+    audioGenerationRef.current += 1;
+
     const audio = audioRef.current;
 
     if (audio) {
@@ -264,7 +260,6 @@ const Multiplayer = forwardRef(function Multiplayer(
       }
 
       audio.removeAttribute("src");
-
       audio.load();
     }
 
@@ -283,9 +278,7 @@ const Multiplayer = forwardRef(function Multiplayer(
     }
 
     previousScoresRef.current = new Map();
-
     roundScoresRef.current = new Map();
-
     displayedTotalsRef.current = new Map();
 
     clearTimeout(scoreTransitionStartRef.current);
@@ -344,7 +337,6 @@ const Multiplayer = forwardRef(function Multiplayer(
       }
 
       const started = Boolean(party.started);
-
       const finished = Boolean(party.gameFinished || party.finished);
 
       const totalRounds = Number(
@@ -376,12 +368,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
   const createParty = useCallback(() => {
     const name = createName.trim();
-
     const rounds = Number(roundCount);
 
     if (!name) {
       setSetupError("Please enter your name.");
-
       return;
     }
 
@@ -400,18 +390,15 @@ const Multiplayer = forwardRef(function Multiplayer(
 
   const joinParty = useCallback(() => {
     const name = joinName.trim();
-
     const code = partyCodeInput.trim().toUpperCase();
 
     if (!name) {
       setSetupError("Please enter your name.");
-
       return;
     }
 
     if (!code) {
       setSetupError("Please enter a party code.");
-
       return;
     }
 
@@ -470,7 +457,6 @@ const Multiplayer = forwardRef(function Multiplayer(
 
     const update = () => {
       const audio = audioRef.current;
-
       const progress = multiProgressRef.current;
 
       if (!audio || !progress) {
@@ -526,117 +512,146 @@ const Multiplayer = forwardRef(function Multiplayer(
     [stopMultiAudio],
   );
 
-  const startAnswerTimer = useCallback(() => {
-    clearTimeout(timerRef.current);
+  /*
+   * IMPORTANT:
+   *
+   * duration and startAt are passed directly into this function.
+   *
+   * We do NOT read them from stateRef immediately after setState()
+   * in startRound(), because React state updates are asynchronous.
+   */
+  const startAnswerTimer = useCallback(
+    (duration, startAt) => {
+      clearTimeout(timerRef.current);
 
-    const current = stateRef.current;
+      const timerDuration = Number(duration) || 15;
 
-    const duration = Number(current.duration) || 15;
+      const timerStartAt = startAt
+        ? new Date(startAt).getTime()
+        : Date.now();
 
-    const startAt = current.startAt
-      ? new Date(current.startAt).getTime()
-      : Date.now();
+      const roundEnd = timerStartAt + timerDuration * 1000;
 
-    const roundEnd = startAt + duration * 1000;
+      const update = () => {
+        const currentState = stateRef.current;
 
-    const update = () => {
-      const currentState = stateRef.current;
-
-      if (!currentState.started || currentState.finished) {
-        return;
-      }
-
-      const now = Date.now();
-
-      const remaining = Math.max(0, roundEnd - now);
-
-      const percentage =
-        duration > 0 ? (remaining / (duration * 1000)) * 100 : 0;
-
-      if (roundProgressRef.current) {
-        const progress = roundProgressRef.current;
-
-        progress.style.width = `${percentage}%`;
-
-        progress.classList.remove("timer-green", "timer-orange", "timer-red");
-
-        if (percentage <= 30) {
-          progress.classList.add("timer-red");
-        } else if (percentage <= 60) {
-          progress.classList.add("timer-orange");
-        } else {
-          progress.classList.add("timer-green");
-        }
-      }
-
-      if (remaining <= 0) {
-        if (!currentState.answered) {
-          submitMultiAnswer(null);
+        if (!currentState.started || currentState.finished) {
+          return;
         }
 
-        requestAnimationFrame(() => {
-          const container = scoreboardRowsRef.current;
+        const now = Date.now();
 
-          if (!container) {
-            return;
+        const remaining = Math.max(0, roundEnd - now);
+
+        const percentage =
+          timerDuration > 0
+            ? (remaining / (timerDuration * 1000)) * 100
+            : 0;
+
+        if (roundProgressRef.current) {
+          const progress = roundProgressRef.current;
+
+          progress.style.width = `${percentage}%`;
+
+          progress.classList.remove(
+            "timer-green",
+            "timer-orange",
+            "timer-red",
+          );
+
+          if (percentage <= 30) {
+            progress.classList.add("timer-red");
+          } else if (percentage <= 60) {
+            progress.classList.add("timer-orange");
+          } else {
+            progress.classList.add("timer-green");
+          }
+        }
+
+        if (remaining <= 0) {
+          if (!currentState.answered) {
+            submitMultiAnswer(null);
           }
 
-          const rows = container.querySelectorAll(".score-row");
+          requestAnimationFrame(() => {
+            const container = scoreboardRowsRef.current;
 
-          rows.forEach((row) => {
-            const playerId = row.dataset.playerId;
-
-            if (!playerId) {
+            if (!container) {
               return;
             }
 
-            const scoreChange = roundScoresRef.current.get(String(playerId));
+            const rows = container.querySelectorAll(".score-row");
 
-            if (scoreChange === undefined) {
-              row.classList.remove("score-waiting", "finished");
+            rows.forEach((row) => {
+              const playerId = row.dataset.playerId;
 
-              row.classList.add("incorrect");
-            }
+              if (!playerId) {
+                return;
+              }
+
+              const scoreChange = roundScoresRef.current.get(
+                String(playerId),
+              );
+
+              if (scoreChange === undefined) {
+                row.classList.remove("score-waiting", "finished");
+                row.classList.add("incorrect");
+              }
+            });
           });
-        });
 
+          return;
+        }
+
+        timerRef.current = setTimeout(update, 50);
+      };
+
+      /*
+       * The state has been scheduled as started, but the timer should
+       * not depend on waiting for the next React render.
+       *
+       * Give React one frame so the DOM progress element is available.
+       */
+      requestAnimationFrame(update);
+    },
+    [submitMultiAnswer],
+  );
+
+  const playMultiClip = useCallback(
+    async () => {
+      const audio = audioRef.current;
+
+      if (!audio) {
         return;
       }
 
-      timerRef.current = setTimeout(update, 50);
-    };
+      try {
+        const current = stateRef.current;
 
-    update();
-  }, [submitMultiAnswer]);
+        const start = Number(current.startTime) || 0;
+        const duration = Number(current.audioDuration) || 0;
 
-  const playMultiClip = useCallback(async () => {
-    const audio = audioRef.current;
+        audio.currentTime = start;
 
-    if (!audio) {
-      return;
-    }
+        await audio.play();
 
-    try {
-      const current = stateRef.current;
+        setState((current) => ({
+          ...current,
+          playing: true,
+        }));
 
-      const start = Number(current.startTime) || 0;
+        updateAudioProgress(start, duration);
+      } catch (error) {
+        console.error("Multiplayer audio playback failed:", error);
 
-      const duration = Number(current.audioDuration) || 0;
-
-      audio.currentTime = start;
-
-      await audio.play();
-
-      setState((current) => ({
-        ...current,
-        playing: true,
-      }));
-
-      updateAudioProgress(start, duration);
-    } catch (error) {
-      console.error("Multiplayer audio playback failed:", error);
-    }
-  }, [updateAudioProgress]);
+        setState((current) => ({
+          ...current,
+          playing: false,
+        }));
+      }
+    },
+    [updateAudioProgress],
+  );
 
   const startRound = useCallback(
     (round) => {
@@ -644,8 +659,13 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       stopMultiAudio();
 
-      roundScoresRef.current = new Map();
+      /*
+       * stopMultiAudio() increments the generation.
+       * Capture the new generation for this round.
+       */
+      const audioGeneration = audioGenerationRef.current;
 
+      roundScoresRef.current = new Map();
       displayedTotalsRef.current = new Map();
 
       setAnimatePositions(0);
@@ -686,40 +706,49 @@ const Multiplayer = forwardRef(function Multiplayer(
 
             row.classList.add("score-waiting");
 
-            const oldPoints = row.querySelector(".round-score-animation");
+            const oldPoints = row.querySelector(
+              ".round-score-animation",
+            );
 
             if (oldPoints) {
               oldPoints.remove();
-            }
-
-            const nameElement = row.children[1];
-
-            if (!nameElement) {
-              return;
             }
           });
         });
       });
 
-      const choices = Array.isArray(round?.choices) ? round.choices : [];
+      const choices = Array.isArray(round?.choices)
+        ? round.choices
+        : [];
 
       const duration =
-        Number(round?.duration) || Number(round?.roundDuration) || 15;
+        Number(round?.duration) ||
+        Number(round?.roundDuration) ||
+        15;
 
       const audioDuration =
-        Number(round?.audioDuration) || Number(round?.duration) || 0;
+        Number(round?.audioDuration) ||
+        Number(round?.duration) ||
+        0;
 
       const startTime = Number(round?.startTime) || 0;
 
       const startAt = round?.startAt ?? null;
 
+      /*
+       * Store the round information first.
+       */
       setState((current) => ({
         ...current,
         inParty: true,
         started: true,
         finished: false,
-        roundNumber: Number(round?.roundNumber) || current.roundNumber + 1,
-        totalRounds: Number(round?.totalRounds) || current.totalRounds,
+        roundNumber:
+          Number(round?.roundNumber) ||
+          current.roundNumber + 1,
+        totalRounds:
+          Number(round?.totalRounds) ||
+          current.totalRounds,
         duration,
         audioDuration,
         startTime,
@@ -735,24 +764,19 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       setRoundResults([]);
 
-      if (roundProgressRef.current) {
-        roundProgressRef.current.style.width = "100%";
-
-        roundProgressRef.current.classList.remove(
-          "timer-green",
-          "timer-orange",
-          "timer-red",
-        );
-      }
-
-      if (multiProgressRef.current) {
-        multiProgressRef.current.style.width = "0%";
-      }
-
       onGameActiveChange?.(true);
 
-      startAnswerTimer();
+      /*
+       * Start the timer using the round values directly.
+       *
+       * This fixes the first-round timer race.
+       */
+      startAnswerTimer(duration, startAt);
 
+      /*
+       * The audio element is always mounted now, so this ref exists
+       * even on the first round.
+       */
       const audio = audioRef.current;
 
       if (!audio || !round?.audioUrl) {
@@ -768,13 +792,21 @@ const Multiplayer = forwardRef(function Multiplayer(
       }
 
       audio.src = round.audioUrl;
-
       audio.load();
 
       let hasStarted = false;
 
+      const cleanupReadyListener = () => {
+        audio.removeEventListener("canplay", handleReady);
+      };
+
       const playWhenReady = async () => {
         if (hasStarted) {
+          return;
+        }
+
+        if (audioGenerationRef.current !== audioGeneration) {
+          cleanupReadyListener();
           return;
         }
 
@@ -790,14 +822,31 @@ const Multiplayer = forwardRef(function Multiplayer(
           if (remaining > 0) {
             hasStarted = false;
 
-            countdownTimerRef.current = setTimeout(playWhenReady, remaining);
+            clearTimeout(countdownTimerRef.current);
 
+            countdownTimerRef.current = setTimeout(
+              playWhenReady,
+              remaining,
+            );
+
+            return;
+          }
+
+          if (audioGenerationRef.current !== audioGeneration) {
             return;
           }
 
           audio.currentTime = startTime;
 
+          /*
+           * Only mark playing after play() succeeds.
+           */
           await audio.play();
+
+          if (audioGenerationRef.current !== audioGeneration) {
+            audio.pause();
+            return;
+          }
 
           setState((current) => ({
             ...current,
@@ -807,23 +856,49 @@ const Multiplayer = forwardRef(function Multiplayer(
           updateAudioProgress(startTime, audioDuration);
 
           if (audioDuration > 0) {
+            clearTimeout(clipTimerRef.current);
+
             clipTimerRef.current = setTimeout(() => {
+              if (
+                audioGenerationRef.current !==
+                audioGeneration
+              ) {
+                return;
+              }
+
               stopMultiAudio();
             }, audioDuration * 1000);
           }
         } catch (error) {
           hasStarted = false;
 
-          console.error("Multiplayer audio playback failed:", error);
+          /*
+           * NotAllowedError normally means the browser blocked
+           * script-initiated autoplay.
+           *
+           * We leave the Play button available in that case.
+           */
+          console.error(
+            "Multiplayer audio playback failed:",
+            error,
+          );
+
+          setState((current) => ({
+            ...current,
+            playing: false,
+          }));
         }
       };
 
       const handleReady = () => {
-        audio.removeEventListener("canplay", handleReady);
-
+        cleanupReadyListener();
         playWhenReady();
       };
 
+      /*
+       * canplay means the browser has enough data to begin
+       * playback. If it is already ready, start immediately.
+       */
       if (audio.readyState >= 3) {
         playWhenReady();
       } else {
@@ -844,26 +919,18 @@ const Multiplayer = forwardRef(function Multiplayer(
       clearTimers();
       stopMultiAudio();
 
-      /*
-       * Make sure a previous position animation
-       * cannot carry into the next round.
-       */
       setAnimatePositions(0);
-
-      /*
-       * LOCK the current ranking.
-       *
-       * The new totals are allowed to appear,
-       * but the rows must stay in their current
-       * positions until the total animation is done.
-       */
       setFreezeRanking(true);
 
       const correctAnswerId = data?.answerId ?? null;
 
-      const results = Array.isArray(data?.results) ? data.results : [];
+      const results = Array.isArray(data?.results)
+        ? data.results
+        : [];
 
-      const players = Array.isArray(data?.players) ? data.players : [];
+      const players = Array.isArray(data?.players)
+        ? data.players
+        : [];
 
       setRoundResults(results);
 
@@ -876,10 +943,6 @@ const Multiplayer = forwardRef(function Multiplayer(
         players,
       }));
 
-      /*
-       * Give React one frame to render the
-       * final player state.
-       */
       requestAnimationFrame(() => {
         const container = scoreboardRowsRef.current;
 
@@ -896,24 +959,16 @@ const Multiplayer = forwardRef(function Multiplayer(
             return;
           }
 
-          const scoreChange = roundScoresRef.current.get(String(playerId));
+          const scoreChange = roundScoresRef.current.get(
+            String(playerId),
+          );
 
-          /*
-           * Player did not answer.
-           */
           if (scoreChange === undefined) {
             row.classList.remove("score-waiting", "finished");
-
             row.classList.add("incorrect");
           }
         });
 
-        /*
-         * STEP 1
-         *
-         * Wait 1.5 seconds before the
-         * round -> total animation.
-         */
         scoreTransitionStartRef.current = setTimeout(() => {
           const currentContainer = scoreboardRowsRef.current;
 
@@ -921,20 +976,13 @@ const Multiplayer = forwardRef(function Multiplayer(
             return;
           }
 
-          const currentRows = currentContainer.querySelectorAll(".score-row");
+          const currentRows =
+            currentContainer.querySelectorAll(".score-row");
 
           currentRows.forEach((row) => {
             row.classList.add("round-complete");
           });
 
-          /*
-           * STEP 2
-           *
-           * Commit the new totals.
-           *
-           * We deliberately do NOT animate
-           * the position yet.
-           */
           scoreTransitionEndRef.current = setTimeout(() => {
             const newTotals = new Map();
 
@@ -945,11 +993,13 @@ const Multiplayer = forwardRef(function Multiplayer(
                 return;
               }
 
-              newTotals.set(String(playerId), getPlayerScore(player));
+              newTotals.set(
+                String(playerId),
+                getPlayerScore(player),
+              );
             });
 
             displayedTotalsRef.current = newTotals;
-
             roundScoresRef.current = new Map();
 
             setState((current) => ({
@@ -957,27 +1007,8 @@ const Multiplayer = forwardRef(function Multiplayer(
               players,
             }));
 
-            /*
-             * STEP 3
-             *
-             * Let the total animation
-             * finish first.
-             *
-             * Then trigger the ranking
-             * movement.
-             */
             scoreTransitionEndRef.current = setTimeout(() => {
-              /*
-               * NOW allow Scoreboard to use the new
-               * ranking order.
-               */
               setFreezeRanking(false);
-
-              /*
-               * This causes Scoreboard's FLIP animation
-               * to run.
-               */
-              // setAnimatePositions((value) => value + 1);
 
               scoreTransitionEndRef.current = null;
             }, 700);
@@ -993,7 +1024,9 @@ const Multiplayer = forwardRef(function Multiplayer(
   const renderFinal = useCallback(
     (players) => {
       const sorted = Array.isArray(players)
-        ? [...players].sort((a, b) => getPlayerScore(b) - getPlayerScore(a))
+        ? [...players].sort(
+            (a, b) => getPlayerScore(b) - getPlayerScore(a),
+          )
         : [];
 
       setFinalPlayers(sorted);
@@ -1004,7 +1037,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const winnerId = getPlayerId(winningPlayer);
 
-      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+      if (
+        winnerId !== null &&
+        String(winnerId) === String(socket.id)
+      ) {
         setWinnerMessage("You win! 🎉");
 
         confetti();
@@ -1041,10 +1077,6 @@ const Multiplayer = forwardRef(function Multiplayer(
       players,
     }));
 
-    /*
-     * The final scoreboard has its own
-     * player list.
-     */
     if (stateRef.current.finished) {
       const sorted = [...players].sort(
         (a, b) => getPlayerScore(b) - getPlayerScore(a),
@@ -1058,7 +1090,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const winnerId = getPlayerId(winningPlayer);
 
-      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+      if (
+        winnerId !== null &&
+        String(winnerId) === String(socket.id)
+      ) {
         setWinnerMessage("You win! 🎉");
       } else {
         setWinnerMessage("");
@@ -1083,12 +1118,18 @@ const Multiplayer = forwardRef(function Multiplayer(
           return;
         }
 
-        const scoreChange = roundScoresRef.current.get(String(playerId));
+        const scoreChange = roundScoresRef.current.get(
+          String(playerId),
+        );
 
         if (scoreChange === undefined) {
           row.classList.add("score-waiting");
 
-          row.classList.remove("finished", "incorrect", "round-complete");
+          row.classList.remove(
+            "finished",
+            "incorrect",
+            "round-complete",
+          );
 
           return;
         }
@@ -1097,11 +1138,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
         if (scoreChange > 0) {
           row.classList.add("finished");
-
           row.classList.remove("incorrect");
         } else {
           row.classList.add("incorrect");
-
           row.classList.remove("finished");
         }
       });
@@ -1166,7 +1205,6 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       if (data?.playerId !== undefined) {
         const playerId = String(data.playerId);
-
         const points = Number(data.points) || 0;
 
         roundScoresRef.current.set(playerId, points);
@@ -1195,7 +1233,6 @@ const Multiplayer = forwardRef(function Multiplayer(
 
     const handleGameFinished = (data) => {
       clearTimers();
-
       stopMultiAudio();
 
       const players = Array.isArray(data?.players)
@@ -1230,7 +1267,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
     const handlePartyError = (data) => {
       setSetupError(
-        typeof data === "string" ? data : data?.message || "Party error.",
+        typeof data === "string"
+          ? data
+          : data?.message || "Party error.",
       );
     };
 
@@ -1243,48 +1282,28 @@ const Multiplayer = forwardRef(function Multiplayer(
     };
 
     socket.on("partyCreated", handlePartyCreated);
-
     socket.on("partyJoined", handlePartyJoined);
-
     socket.on("partyUpdated", handlePartyUpdated);
-
     socket.on("hostChanged", handleHostChanged);
-
     socket.on("roundStarted", handleRoundStarted);
-
     socket.on("answerAccepted", handleAnswerAccepted);
-
     socket.on("roundFinished", handleRoundFinished);
-
     socket.on("gameFinished", handleGameFinished);
-
     socket.on("newGameStarted", handleNewGameStarted);
-
     socket.on("partyError", handlePartyError);
-
     socket.on("errorMessage", handleErrorMessage);
 
     return () => {
       socket.off("partyCreated", handlePartyCreated);
-
       socket.off("partyJoined", handlePartyJoined);
-
       socket.off("partyUpdated", handlePartyUpdated);
-
       socket.off("hostChanged", handleHostChanged);
-
       socket.off("roundStarted", handleRoundStarted);
-
       socket.off("answerAccepted", handleAnswerAccepted);
-
       socket.off("roundFinished", handleRoundFinished);
-
       socket.off("gameFinished", handleGameFinished);
-
       socket.off("newGameStarted", handleNewGameStarted);
-
       socket.off("partyError", handlePartyError);
-
       socket.off("errorMessage", handleErrorMessage);
     };
   }, [
@@ -1314,7 +1333,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 type="text"
                 placeholder="Your name"
                 value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
+                onChange={(event) =>
+                  setCreateName(event.target.value)
+                }
                 maxLength={20}
               />
 
@@ -1322,14 +1343,13 @@ const Multiplayer = forwardRef(function Multiplayer(
                 id="roundCount"
                 className="multi-select"
                 value={roundCount}
-                onChange={(event) => setRoundCount(event.target.value)}
+                onChange={(event) =>
+                  setRoundCount(event.target.value)
+                }
               >
                 <option value="5">5 rounds</option>
-
                 <option value="10">10 rounds</option>
-
                 <option value="15">15 rounds</option>
-
                 <option value="20">20 rounds</option>
               </select>
 
@@ -1353,7 +1373,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 type="text"
                 placeholder="Your name"
                 value={joinName}
-                onChange={(event) => setJoinName(event.target.value)}
+                onChange={(event) =>
+                  setJoinName(event.target.value)
+                }
                 maxLength={20}
               />
 
@@ -1363,7 +1385,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 placeholder="Party code"
                 value={partyCodeInput}
                 onChange={(event) =>
-                  setPartyCodeInput(event.target.value.toUpperCase())
+                  setPartyCodeInput(
+                    event.target.value.toUpperCase(),
+                  )
                 }
                 maxLength={6}
               />
@@ -1401,6 +1425,20 @@ const Multiplayer = forwardRef(function Multiplayer(
           />
         )}
 
+      {/*
+       * IMPORTANT:
+       *
+       * Audio is deliberately outside the state.started conditional.
+       *
+       * This means the audio element already exists when the first
+       * roundStarted socket event arrives.
+       */}
+      <audio
+        ref={audioRef}
+        id="multiAudio"
+        preload="auto"
+      />
+
       {state.started && (
         <section id="multiGame">
           <div className="multi-round-header">
@@ -1418,9 +1456,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
             <h2>Which video is this?</h2>
 
-            <p className="muted">Listen to the clip and choose the video.</p>
-
-            <audio ref={audioRef} id="multiAudio" />
+            <p className="muted">
+              Listen to the clip and choose the video.
+            </p>
 
             <div className="player">
               <button
@@ -1439,7 +1477,10 @@ const Multiplayer = forwardRef(function Multiplayer(
               </button>
 
               <div className="bar">
-                <div ref={multiProgressRef} id="multiProgress" />
+                <div
+                  ref={multiProgressRef}
+                  id="multiProgress"
+                />
               </div>
 
               <span id="multiDuration">
@@ -1447,20 +1488,26 @@ const Multiplayer = forwardRef(function Multiplayer(
               </span>
             </div>
 
-            <div id="multiChoices" className="multi-choices">
+            <div
+              id="multiChoices"
+              className="multi-choices"
+            >
               {state.choices.map((choice, index) => {
                 const choiceId = getChoiceId(choice);
 
                 const isSelected =
                   state.selectedAnswerId !== null &&
-                  String(state.selectedAnswerId) === String(choiceId);
+                  String(state.selectedAnswerId) ===
+                    String(choiceId);
 
                 const isCorrectChoice =
                   state.correctAnswerId !== null &&
-                  String(state.correctAnswerId) === String(choiceId);
+                  String(state.correctAnswerId) ===
+                    String(choiceId);
 
                 const isImmediatelyCorrect =
-                  state.answerCorrect === true && isSelected;
+                  state.answerCorrect === true &&
+                  isSelected;
 
                 const isWrongSelectedChoice =
                   state.answerCorrect === false &&
@@ -1469,7 +1516,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
                 let choiceClass = "choice-button";
 
-                if (isCorrectChoice || isImmediatelyCorrect) {
+                if (
+                  isCorrectChoice ||
+                  isImmediatelyCorrect
+                ) {
                   choiceClass += " correct";
                 } else if (isWrongSelectedChoice) {
                   choiceClass += " incorrect";
@@ -1483,17 +1533,24 @@ const Multiplayer = forwardRef(function Multiplayer(
                     type="button"
                     className={choiceClass}
                     disabled={isDisabled}
-                    onClick={() => submitMultiAnswer(choiceId)}
+                    onClick={() =>
+                      submitMultiAnswer(choiceId)
+                    }
                   >
-                    <span className="choice-number">{index + 1}</span>
+                    <span className="choice-number">
+                      {index + 1}
+                    </span>
 
                     <span className="choice-title">
                       {getChoiceTitle(choice)}
                     </span>
 
-                    {isSelected && state.answerCorrect !== null && (
-                      <span>{state.answerCorrect ? "✓" : "✕"}</span>
-                    )}
+                    {isSelected &&
+                      state.answerCorrect !== null && (
+                        <span>
+                          {state.answerCorrect ? "✓" : "✕"}
+                        </span>
+                      )}
                   </button>
                 );
               })}
@@ -1512,18 +1569,30 @@ const Multiplayer = forwardRef(function Multiplayer(
       )}
 
       {isFinal && (
-        <section id="multiFinalResult" className="card game-card">
+        <section
+          id="multiFinalResult"
+          className="card game-card"
+        >
           <h2>Game finished!</h2>
 
           {winnerMessage && (
-            <div className="winner-message">{winnerMessage}</div>
+            <div className="winner-message">
+              {winnerMessage}
+            </div>
           )}
 
-          <div id="finalScoreboard" className="scoreboard">
+          <div
+            id="finalScoreboard"
+            className="scoreboard"
+          >
             {finalPlayers.map((player, index) => (
               <div
-                className={`score-row ${index === 0 ? "leader" : ""}`}
-                key={String(getPlayerId(player) ?? index)}
+                className={`score-row ${
+                  index === 0 ? "leader" : ""
+                }`}
+                key={String(
+                  getPlayerId(player) ?? index,
+                )}
               >
                 <span>{index + 1}</span>
 
