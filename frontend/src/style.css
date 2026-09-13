@@ -110,6 +110,7 @@ h2 {
   border-radius: 11px;
   cursor: pointer;
   font-weight: 750;
+
   transition:
     background 0.18s,
     color 0.18s,
@@ -179,7 +180,6 @@ h2 {
   color: #101218;
   padding: 13px 19px;
   font-weight: 800;
-
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
 }
 
@@ -293,19 +293,19 @@ form .primary {
 .sound-icon {
   width: 82px;
   height: 82px;
-
   display: grid;
   place-items: center;
-
   margin: 0 auto 22px;
-
   border-radius: 50%;
 
-  background: linear-gradient(145deg, #30394d, #1d2432);
+  background: linear-gradient(
+    145deg,
+    #30394d,
+    #1d2432
+  );
+
   border: 1px solid rgba(255, 255, 255, 0.1);
-
   font-size: 35px;
-
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
 }
 
@@ -323,7 +323,6 @@ form .primary {
   display: flex;
   align-items: center;
   gap: 13px;
-
   margin: 32px auto;
   max-width: 680px;
 }
@@ -332,12 +331,9 @@ form .primary {
   width: 52px;
   height: 52px;
   flex-shrink: 0;
-
   background: #fff;
   color: #111;
-
   font-size: 19px;
-
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
 
@@ -348,10 +344,8 @@ form .primary {
 .bar {
   height: 9px;
   flex: 1;
-
   border-radius: 20px;
   background: #303849;
-
   overflow: hidden;
 }
 
@@ -359,10 +353,8 @@ form .primary {
 #multiProgress {
   height: 100%;
   width: 0;
-
   background: #fff;
   border-radius: inherit;
-
   transition: width 0.08s linear;
 }
 
@@ -370,9 +362,7 @@ form .primary {
 #multiDuration {
   min-width: 38px;
   text-align: right;
-
   color: #9ba5b8;
-
   font-size: 13px;
   font-weight: 600;
 }
@@ -395,20 +385,15 @@ form .primary {
 .suggestions {
   position: absolute;
   z-index: 20;
-
   left: 0;
   right: 0;
   top: calc(100% + 7px);
 
   background: #181d28;
-
   border: none;
   border-radius: 13px;
-
   overflow: hidden;
-
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-
   text-align: left;
 }
 
@@ -418,18 +403,12 @@ form .primary {
 
 .suggestion {
   display: block;
-
   width: 100%;
-
   background: transparent;
   color: #fff;
-
   padding: 14px 16px;
-
   text-align: left;
-
   cursor: pointer;
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 
   transition: background 0.15s;
@@ -445,10 +424,8 @@ form .primary {
 
 #submitAnswer {
   display: block;
-
   width: 100%;
   max-width: 720px;
-
   margin: 12px auto 0;
 }
 
@@ -458,12 +435,9 @@ form .primary {
 
 .result {
   max-width: 720px;
-
   margin: 20px auto 0;
   padding: 17px;
-
   border-radius: 14px;
-
   font-size: 17px;
   font-weight: 800;
 }
@@ -496,27 +470,21 @@ form .primary {
 
 .multi-actions {
   display: grid;
-
   grid-template-columns:
     minmax(0, 1fr)
     35px
     minmax(0, 1fr);
 
   gap: 14px;
-
   align-items: center;
-
   margin-top: 25px;
 }
 
 .multi-box {
   min-width: 0;
-
   background: rgba(9, 12, 18, 0.7);
-
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 18px;
-
   padding: 18px;
 }
 
@@ -538,9 +506,7 @@ form .primary {
 .multi-divider {
   display: grid;
   place-items: center;
-
   color: #667185;
-
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1px;
@@ -556,14 +522,10 @@ form .primary {
 
 .lobby-header {
   display: flex;
-
   align-items: center;
   justify-content: space-between;
-
   gap: 20px;
-
   padding-bottom: 22px;
-
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -576,32 +538,25 @@ form .primary {
 .lobby-header .muted {
   font-size: 11px;
   line-height: 1;
-
   text-transform: uppercase;
   letter-spacing: 1.5px;
   font-weight: 800;
-
   color: #7f8b9f;
 }
 
 .party-code {
   display: block;
-
   font-size: 34px;
   line-height: 1;
-
   font-weight: 900;
   letter-spacing: 7px;
-
   color: #fff;
 }
 
 #lobbyRounds {
   margin: 18px 0 12px;
-
   font-size: 13px;
   font-weight: 600;
-
   color: #8994a9;
 }
 
@@ -614,20 +569,14 @@ form .primary {
 .copy-party-code {
   display: grid;
   place-items: center;
-
   width: 34px;
   height: 34px;
-
   margin: 0;
   padding: 0;
-
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9px;
-
   background: rgba(255, 255, 255, 0.05);
-
   color: #aeb7c7;
-
   cursor: pointer;
 
   transition:
@@ -638,9 +587,7 @@ form .primary {
 
 .copy-party-code:hover {
   background: rgba(255, 255, 255, 0.1);
-
   border-color: rgba(255, 255, 255, 0.18);
-
   color: #fff;
 }
 
@@ -658,28 +605,22 @@ form .primary {
 .player-list {
   display: flex;
   flex-direction: column;
-
   gap: 8px;
-
   margin: 0 0 24px;
 }
 
 .player-row {
   display: grid;
-
   grid-template-columns:
     50%
     minmax(0, 1fr)
     auto;
 
   align-items: center;
-
   min-height: 58px;
-
   padding: 10px 14px;
 
   background: rgba(9, 12, 18, 0.65);
-
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 13px;
 
@@ -691,20 +632,15 @@ form .primary {
 
 .player-row:hover {
   background: rgba(30, 36, 49, 0.8);
-
   border-color: rgba(255, 255, 255, 0.12);
-
   transform: translateY(-1px);
 }
 
 .player-row span {
   min-width: 0;
-
   color: #f5f6f8;
-
   font-size: 15px;
   font-weight: 700;
-
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -712,11 +648,8 @@ form .primary {
 
 .player-row strong {
   min-width: 42px;
-
   text-align: right;
-
   color: #aeb7c7;
-
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.5px;
@@ -724,19 +657,14 @@ form .primary {
 
 #startPartyBtn {
   display: block;
-
   width: 100%;
-
   margin-top: 4px;
 }
 
 .lobby-hint {
   margin: 12px 0 0;
-
   text-align: center;
-
   color: #737e92;
-
   font-size: 13px;
   line-height: 1.5;
 }
@@ -756,46 +684,33 @@ form .primary {
 
 .multi-round-header {
   width: 100%;
-
   margin: 0 auto 10px;
-
   display: flex;
-
   align-items: center;
   justify-content: center;
-
   padding: 0;
 }
 
 .multi-round-header > span {
   font-size: 15px;
   font-weight: 750;
-
   color: #9da8bb;
-
   letter-spacing: -0.01em;
 }
 
 .multi-round-progress {
   width: 100%;
-
   height: 6px;
-
   margin: 0 auto 28px;
-
   background: #303849;
-
   border-radius: 999px;
-
   overflow: hidden;
 }
 
 #multiRoundProgress {
   width: 100%;
   height: 100%;
-
   border-radius: inherit;
-
   background: #22c55e;
 
   transition:
@@ -818,45 +733,35 @@ form .primary {
 .multi-choices {
   width: 100%;
   max-width: 900px;
-
   margin: 24px auto 0;
-
   display: grid;
-
   grid-template-columns: repeat(2, minmax(0, 1fr));
-
   gap: 14px;
-
   padding: 0;
 }
 
 .choice-button {
   display: flex;
-
   align-items: center;
-
   gap: 14px;
-
   width: 100%;
   min-width: 0;
   max-width: 100%;
-
   min-height: 76px;
-
   padding: 15px 17px;
 
   -webkit-tap-highlight-color: transparent;
 
-  background: linear-gradient(145deg, #1c2230, #171c27);
+  background: linear-gradient(
+    145deg,
+    #1c2230,
+    #171c27
+  );
 
   border: 1px solid rgba(255, 255, 255, 0.08);
-
   color: #fff;
-
   border-radius: 15px;
-
   cursor: pointer;
-
   text-align: left;
 
   transition:
@@ -878,7 +783,11 @@ form .primary {
   .choice-button:hover {
     transform: translateY(-2px);
 
-    background: linear-gradient(145deg, #282f40, #202735);
+    background: linear-gradient(
+      145deg,
+      #282f40,
+      #202735
+    );
 
     border-color: rgba(255, 255, 255, 0.15);
   }
@@ -886,9 +795,7 @@ form .primary {
 
 .choice-button.correct {
   background: #173a2a;
-
   border-color: #4fd18b;
-
   color: #85e3b0;
 }
 
@@ -899,9 +806,7 @@ form .primary {
 
 .choice-button.incorrect {
   background: #3d2228;
-
   border-color: #e06464;
-
   color: #ffaaa9;
 }
 
@@ -913,27 +818,19 @@ form .primary {
 .choice-number {
   width: 35px;
   height: 35px;
-
   flex-shrink: 0;
-
   display: grid;
   place-items: center;
-
   border-radius: 10px;
-
   background: #30394b;
-
   color: #dbe0e9;
-
   font-weight: 850;
 }
 
 .choice-title {
   min-width: 0;
   flex: 1;
-
   overflow: hidden;
-
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -944,13 +841,9 @@ form .primary {
 
 .answer-status {
   max-width: 720px;
-
   margin: 18px auto 0;
-
   padding: 15px;
-
   border-radius: 13px;
-
   font-weight: 800;
 }
 
@@ -979,19 +872,14 @@ form .primary {
 
 .score-title {
   margin: 42px auto 10px;
-
   max-width: 720px;
-
   text-align: left;
-
   font-size: 15px;
-
   color: #9ba5b8;
 }
 
 .scoreboard {
   margin: 0 auto;
-
   text-align: left;
 }
 
@@ -1001,7 +889,6 @@ form .primary {
 
 .score-header {
   display: grid;
-
   grid-template-columns:
     42px
     minmax(0, 1fr)
@@ -1010,18 +897,13 @@ form .primary {
     32px;
 
   align-items: center;
-
   gap: 10px;
-
   width: 100%;
-
   padding: 0 14px 8px;
 
   color: #667185;
-
   font-size: 10px;
   font-weight: 800;
-
   letter-spacing: 1px;
   text-transform: uppercase;
 }
@@ -1048,50 +930,82 @@ form .primary {
 
   grid-template-columns:
     42px
+    minmax(0, 1fr);
+
+  align-items: center;
+  gap: 10px;
+
+  min-height: 48px;
+  padding: 12px 10px;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+
+  /*
+   * IMPORTANT:
+   * The row itself NEVER moves.
+   * Only .score-player-content moves.
+   */
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* ----------------------------------------------------------
+   Player content
+   ---------------------------------------------------------- */
+
+.score-player-content {
+  display: grid;
+
+  grid-template-columns:
     minmax(0, 1fr)
     80px
     80px
     32px;
 
   align-items: center;
-
   gap: 10px;
 
-  min-height: 48px;
-
-  padding: 12px 10px;
-
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-
-  border-radius: 12px;
+  transform:
+    translateY(
+      var(--score-move-y, 0px)
+    );
 
   transition:
-    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.3s ease,
-    box-shadow 0.3s ease;
+    transform 0.9s cubic-bezier(
+      0.16,
+      1,
+      0.3,
+      1
+    );
 
   will-change: transform;
 }
 
-.score-row > span:first-child {
-  color: #7f8b9f;
-
-  font-weight: 700;
-
-  text-align: center;
+.score-player-content.score-moving {
+  transition: none;
 }
 
-.score-row > span:nth-child(2) {
-  min-width: 0;
+/* Player name */
 
+.score-player-content > span:first-child {
+  min-width: 0;
   overflow: hidden;
 
   color: #f5f6f8;
-
   font-weight: 700;
 
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Fixed position number */
+
+.score-row > span:first-child {
+  color: #7f8b9f;
+  font-weight: 700;
+  text-align: center;
 }
 
 /* ----------------------------------------------------------
@@ -1101,9 +1015,15 @@ form .primary {
 .score-row.leader {
   width: 100%;
 
-  background: linear-gradient(145deg, #292438, #211d30);
+  background: linear-gradient(
+    145deg,
+    #292438,
+    #211d30
+  );
 
-  box-shadow: 0 0 20px rgba(255, 215, 80, 0.16);
+  box-shadow:
+    0 0 20px
+    rgba(255, 215, 80, 0.16);
 
   padding: 20px 50px;
 }
@@ -1113,13 +1033,19 @@ form .primary {
   font-size: 1.15em;
 }
 
-.score-row.leader > span:nth-child(2) {
+.score-row.leader
+  .score-player-content
+  > span:first-child {
   font-size: 1.15em;
   font-weight: bold;
 }
 
-.score-row.leader .round-score,
-.score-row.leader .total-score {
+.score-row.leader
+  .score-player-content
+  .round-score,
+.score-row.leader
+  .score-player-content
+  .total-score {
   font-size: 1.12em;
 }
 
@@ -1129,12 +1055,9 @@ form .primary {
 
 .score-row .round-score {
   color: #fff;
-
   font-size: 15px;
   font-weight: 800;
-
   text-align: center;
-
   font-variant-numeric: tabular-nums;
 
   transition:
@@ -1148,12 +1071,9 @@ form .primary {
 
 .score-row .total-score {
   color: #fff;
-
   font-size: 16px;
   font-weight: 900;
-
   text-align: center;
-
   font-variant-numeric: tabular-nums;
 
   transition:
@@ -1167,7 +1087,6 @@ form .primary {
 
 .score-row .score-result {
   display: flex;
-
   align-items: center;
   justify-content: center;
 
@@ -1176,7 +1095,6 @@ form .primary {
 
   font-size: 18px;
   font-weight: 900;
-
   text-align: center;
 }
 
@@ -1184,61 +1102,65 @@ form .primary {
    Waiting
    ---------------------------------------------------------- */
 
-.score-row.score-waiting .score-result::after {
+/* .score-row.score-waiting
+  .score-result::after {
   content: "...";
 
   color: #7f8b9f;
-
   font-size: 17px;
   font-weight: 900;
-
   letter-spacing: 1px;
 
-  animation: scoreDotsText 1.2s ease-in-out infinite;
-}
+  animation:
+    scoreDotsText 1.2s ease-in-out infinite;
+} */
 
 /* ----------------------------------------------------------
    Correct
    ---------------------------------------------------------- */
 
-.score-row.finished .score-result::after {
+/* .score-row.finished
+  .score-result::after {
   content: "✓";
 
   color: #85e3b0;
-
   font-size: 19px;
   font-weight: 900;
 
-  animation: resultAppear 0.25s ease-out;
-}
+  animation:
+    resultAppear 0.25s ease-out;
+} */
 
 /* ----------------------------------------------------------
    Incorrect
    ---------------------------------------------------------- */
 
-.score-row.incorrect .score-result::after {
+/* .score-row.incorrect
+  .score-result::after {
   content: "✕";
 
   color: #ff6b6b;
-
   font-size: 18px;
   font-weight: 900;
 
-  animation: resultAppear 0.25s ease-out;
-}
+  animation:
+    resultAppear 0.25s ease-out;
+} */
 
 /* ----------------------------------------------------------
    Round finished animation
    ---------------------------------------------------------- */
 
-.score-row.round-complete .round-score {
+.score-row.round-complete
+  .round-score {
   opacity: 0;
-
   transform: translateX(18px);
 }
 
-.score-row.round-complete .total-score {
-  animation: totalScoreReveal 0.55s ease-out;
+.score-row.round-complete
+  .total-score {
+  animation:
+    totalScoreReveal 0.55s ease-out;
 }
 
 /* ==========================================================
@@ -1259,13 +1181,11 @@ form .primary {
 @keyframes resultAppear {
   0% {
     opacity: 0;
-
     transform: scale(0.65);
   }
 
   100% {
     opacity: 1;
-
     transform: scale(1);
   }
 }
@@ -1311,21 +1231,15 @@ form .primary {
 
 .round-results {
   max-width: 600px;
-
   margin: 18px auto 0;
-
   font-size: 15px;
 }
 
 .round-result-row {
   display: flex;
-
   justify-content: space-between;
-
   gap: 20px;
-
   padding: 10px 2px;
-
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -1348,19 +1262,14 @@ form .primary {
 
 .winner-message {
   font-size: 2rem;
-
   font-weight: 700;
-
   text-align: center;
-
   margin-bottom: 1rem;
 }
 
 .final-actions {
   display: flex;
-
   gap: 12px;
-
   justify-content: center;
 }
 
@@ -1370,23 +1279,16 @@ form .primary {
 
 .library-head {
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
 }
 
 .video-row {
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
-
   gap: 20px;
-
   padding: 16px 0;
-
   border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -1397,35 +1299,24 @@ form .primary {
 
 .video-row small {
   color: #8e99ad;
-
   margin-top: 4px;
 }
 
 #url {
   width: 100%;
-
   resize: vertical;
-
   min-height: 110px;
-
   background: #0b0e14;
-
   border: 1px solid #353d4e;
-
   color: #fff;
-
   padding: 14px;
-
   border-radius: 13px;
-
   outline: none;
-
   margin-bottom: 12px;
 }
 
 #url:focus {
   border-color: #68758d;
-
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
 }
 
@@ -1440,15 +1331,12 @@ form .primary {
 .choice-button:disabled,
 .choice-button.disabled {
   cursor: not-allowed !important;
-
   pointer-events: none !important;
-
   opacity: 0.4 !important;
 }
 
 .choice-button.disabled .choice-number {
   background: #353b48 !important;
-
   color: #858d9c !important;
 }
 
@@ -1461,13 +1349,40 @@ form .primary {
 }
 
 /* ==========================================================
+   FINAL SCOREBOARD
+   ========================================================== */
+
+#finalScoreboard .score-row {
+  grid-template-columns:
+    42px
+    minmax(0, 1fr)
+    80px;
+}
+
+#finalScoreboard .score-row > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  color: #f5f6f8;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#finalScoreboard .score-row > strong {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 900;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================
    MOBILE
    ========================================================== */
 
 @media (max-width: 650px) {
   .app {
     width: calc(100% - 20px);
-
     padding: 22px 0 50px;
   }
 
@@ -1477,7 +1392,6 @@ form .primary {
 
   h1 {
     font-size: 34px;
-
     letter-spacing: -1.5px;
   }
 
@@ -1487,7 +1401,6 @@ form .primary {
 
   .card {
     padding: 22px;
-
     border-radius: 20px;
   }
 
@@ -1502,7 +1415,6 @@ form .primary {
   .sound-icon {
     width: 68px;
     height: 68px;
-
     font-size: 28px;
   }
 
@@ -1522,7 +1434,6 @@ form .primary {
 
   .multi-actions {
     grid-template-columns: 1fr;
-
     gap: 10px;
   }
 
@@ -1542,7 +1453,6 @@ form .primary {
 
   .party-code {
     font-size: 28px;
-
     letter-spacing: 5px;
   }
 
@@ -1553,7 +1463,6 @@ form .primary {
       auto;
 
     min-height: 54px;
-
     padding: 9px 11px;
   }
 
@@ -1561,7 +1470,6 @@ form .primary {
 
   .multi-choices {
     grid-template-columns: 1fr;
-
     gap: 10px;
   }
 
@@ -1571,7 +1479,6 @@ form .primary {
 
   .party-code {
     font-size: 30px;
-
     letter-spacing: 5px;
   }
 
@@ -1593,19 +1500,14 @@ form .primary {
 
   .multi-round-progress {
     height: 7px;
-
     margin-bottom: 22px;
   }
 
   .choice-title {
     white-space: normal;
-
     overflow: visible;
-
     text-overflow: clip;
-
     overflow-wrap: anywhere;
-
     line-height: 1.3;
   }
 
@@ -1613,8 +1515,7 @@ form .primary {
      Scoreboard mobile
      -------------------------------------------------------- */
 
-  .score-header,
-  .score-row {
+  .score-header {
     grid-template-columns:
       30px
       minmax(0, 1fr)
@@ -1625,9 +1526,38 @@ form .primary {
     gap: 6px;
   }
 
+  /*
+   * Rows now only have:
+   *
+   * position | player content
+   */
+
+  .score-row {
+    grid-template-columns:
+      30px
+      minmax(0, 1fr);
+
+    gap: 6px;
+  }
+
+  /*
+   * The inner player content contains:
+   *
+   * name | round | total | result
+   */
+
+  .score-player-content {
+    grid-template-columns:
+      minmax(0, 1fr)
+      55px
+      55px
+      28px;
+
+    gap: 6px;
+  }
+
   .score-header {
     padding: 0 10px 8px;
-
     font-size: 9px;
   }
 
@@ -1637,15 +1567,12 @@ form .primary {
 
   .score-row {
     min-height: 44px;
-
     padding: 9px 10px;
   }
 
   .score-row.leader {
     width: 100%;
-
     min-height: 58px;
-
     padding: 16px 14px;
   }
 
@@ -1653,7 +1580,9 @@ form .primary {
     font-size: 1em;
   }
 
-  .score-row.leader > span:nth-child(2) {
+  .score-row.leader
+    .score-player-content
+    > span:first-child {
     font-size: 1em;
   }
 
@@ -1662,8 +1591,12 @@ form .primary {
     font-size: 14px;
   }
 
-  .score-row.leader .round-score,
-  .score-row.leader .total-score {
+  .score-row.leader
+    .score-player-content
+    .round-score,
+  .score-row.leader
+    .score-player-content
+    .total-score {
     font-size: 16px;
   }
 
@@ -1671,17 +1604,20 @@ form .primary {
     width: 28px;
   }
 
-  .score-row.score-waiting .score-result::after {
+  /* .score-row.score-waiting
+    .score-result::after {
     font-size: 15px;
   }
 
-  .score-row.finished .score-result::after {
+  .score-row.finished
+    .score-result::after {
     font-size: 17px;
   }
 
-  .score-row.incorrect .score-result::after {
+  .score-row.incorrect
+    .score-result::after {
     font-size: 16px;
-  }
+  } */
 }
 
 /* ==========================================================
@@ -1707,7 +1643,6 @@ form .primary {
 
   .multi-round-progress {
     height: 6px;
-
     margin-bottom: 19px;
   }
 
@@ -1726,16 +1661,32 @@ form .primary {
 
   .party-code {
     font-size: 25px;
-
     letter-spacing: 4px;
   }
 
   /* Scoreboard */
 
-  .score-header,
+  .score-header {
+    grid-template-columns:
+      26px
+      minmax(0, 1fr)
+      48px
+      48px
+      25px;
+
+    gap: 4px;
+  }
+
   .score-row {
     grid-template-columns:
       26px
+      minmax(0, 1fr);
+
+    gap: 4px;
+  }
+
+  .score-player-content {
+    grid-template-columns:
       minmax(0, 1fr)
       48px
       48px
@@ -1759,7 +1710,7 @@ form .primary {
     padding-right: 10px;
   }
 
-  .score-row > span:nth-child(2) {
+  .score-player-content > span:first-child {
     font-size: 14px;
   }
 
@@ -1768,8 +1719,12 @@ form .primary {
     font-size: 13px;
   }
 
-  .score-row.leader .round-score,
-  .score-row.leader .total-score {
+  .score-row.leader
+    .score-player-content
+    .round-score,
+  .score-row.leader
+    .score-player-content
+    .total-score {
     font-size: 14px;
   }
 }

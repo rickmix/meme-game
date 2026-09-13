@@ -144,6 +144,17 @@ const Multiplayer = forwardRef(function Multiplayer(
 
   const [winnerMessage, setWinnerMessage] = useState("");
 
+  /*
+   * Changes only after the normal round -> total
+   * animation has finished.
+   *
+   * Scoreboard uses this to start the ranking
+   * movement animation.
+   */
+  const [animatePositions, setAnimatePositions] = useState(0);
+
+  const [freezeRanking, setFreezeRanking] = useState(false);
+
   const audioRef = useRef(null);
 
   const multiProgressRef = useRef(null);
@@ -169,6 +180,7 @@ const Multiplayer = forwardRef(function Multiplayer(
   const displayedTotalsRef = useRef(new Map());
 
   const scoreTransitionStartRef = useRef(null);
+
   const scoreTransitionEndRef = useRef(null);
 
   useEffect(() => {
@@ -176,22 +188,24 @@ const Multiplayer = forwardRef(function Multiplayer(
   }, [state]);
 
   const clearTimers = useCallback(() => {
-  clearTimeout(clipTimerRef.current);
-  clearTimeout(countdownTimerRef.current);
-  clearTimeout(timerRef.current);
+    clearTimeout(clipTimerRef.current);
+    clearTimeout(countdownTimerRef.current);
+    clearTimeout(timerRef.current);
 
-  clearTimeout(scoreTransitionStartRef.current);
-  clearTimeout(scoreTransitionEndRef.current);
+    clearTimeout(scoreTransitionStartRef.current);
+    clearTimeout(scoreTransitionEndRef.current);
 
-  cancelAnimationFrame(progressAnimationRef.current);
+    cancelAnimationFrame(progressAnimationRef.current);
 
-  clipTimerRef.current = null;
-  countdownTimerRef.current = null;
-  timerRef.current = null;
-  scoreTransitionStartRef.current = null;
-  scoreTransitionEndRef.current = null;
-  progressAnimationRef.current = null;
-}, []);
+    clipTimerRef.current = null;
+    countdownTimerRef.current = null;
+    timerRef.current = null;
+
+    scoreTransitionStartRef.current = null;
+    scoreTransitionEndRef.current = null;
+
+    progressAnimationRef.current = null;
+  }, []);
 
   const stopMultiAudio = useCallback(() => {
     clearTimeout(clipTimerRef.current);
@@ -269,7 +283,9 @@ const Multiplayer = forwardRef(function Multiplayer(
     }
 
     previousScoresRef.current = new Map();
+
     roundScoresRef.current = new Map();
+
     displayedTotalsRef.current = new Map();
 
     clearTimeout(scoreTransitionStartRef.current);
@@ -277,6 +293,8 @@ const Multiplayer = forwardRef(function Multiplayer(
 
     scoreTransitionStartRef.current = null;
     scoreTransitionEndRef.current = null;
+
+    setAnimatePositions(0);
 
     setState({
       ...INITIAL_STATE,
@@ -630,6 +648,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       displayedTotalsRef.current = new Map();
 
+      setAnimatePositions(0);
+      setFreezeRanking(false);
+
       const playersAtRoundStart = stateRef.current.players || [];
 
       playersAtRoundStart.forEach((player) => {
@@ -818,123 +839,156 @@ const Multiplayer = forwardRef(function Multiplayer(
     ],
   );
 
- const finishRound = useCallback(
-  (data) => {
-    clearTimers();
-    stopMultiAudio();
-
-    const correctAnswerId = data?.answerId ?? null;
-
-    const results = Array.isArray(data?.results)
-      ? data.results
-      : [];
-
-    const players = Array.isArray(data?.players)
-      ? data.players
-      : [];
-
-    setRoundResults(results);
-
-    setState((current) => ({
-      ...current,
-      started: true,
-      answered: true,
-      playing: false,
-      correctAnswerId,
-      players,
-    }));
-
-    /*
-     * Give React one frame to render the final
-     * player state before applying the results.
-     */
-    requestAnimationFrame(() => {
-      const container = scoreboardRowsRef.current;
-
-      if (!container) {
-        return;
-      }
-
-      const rows = container.querySelectorAll(".score-row");
-
-      rows.forEach((row) => {
-        const playerId = row.dataset.playerId;
-
-        if (!playerId) {
-          return;
-        }
-
-        const scoreChange =
-          roundScoresRef.current.get(String(playerId));
-
-        /*
-         * Player never answered.
-         */
-        if (scoreChange === undefined) {
-          row.classList.remove(
-            "score-waiting",
-            "finished",
-          );
-
-          row.classList.add("incorrect");
-        }
-      });
+  const finishRound = useCallback(
+    (data) => {
+      clearTimers();
+      stopMultiAudio();
 
       /*
-       * Start the round-complete animation shortly
-       * after showing the final ✓ / ✕ state.
+       * Make sure a previous position animation
+       * cannot carry into the next round.
        */
-      scoreTransitionStartRef.current = setTimeout(() => {
-        const currentContainer = scoreboardRowsRef.current;
+      setAnimatePositions(0);
 
-        if (!currentContainer) {
+      /*
+       * LOCK the current ranking.
+       *
+       * The new totals are allowed to appear,
+       * but the rows must stay in their current
+       * positions until the total animation is done.
+       */
+      setFreezeRanking(true);
+
+      const correctAnswerId = data?.answerId ?? null;
+
+      const results = Array.isArray(data?.results) ? data.results : [];
+
+      const players = Array.isArray(data?.players) ? data.players : [];
+
+      setRoundResults(results);
+
+      setState((current) => ({
+        ...current,
+        started: true,
+        answered: true,
+        playing: false,
+        correctAnswerId,
+        players,
+      }));
+
+      /*
+       * Give React one frame to render the
+       * final player state.
+       */
+      requestAnimationFrame(() => {
+        const container = scoreboardRowsRef.current;
+
+        if (!container) {
           return;
         }
 
-        const currentRows =
-          currentContainer.querySelectorAll(".score-row");
+        const rows = container.querySelectorAll(".score-row");
 
-        currentRows.forEach((row) => {
-          row.classList.add("round-complete");
+        rows.forEach((row) => {
+          const playerId = row.dataset.playerId;
+
+          if (!playerId) {
+            return;
+          }
+
+          const scoreChange = roundScoresRef.current.get(String(playerId));
+
+          /*
+           * Player did not answer.
+           */
+          if (scoreChange === undefined) {
+            row.classList.remove("score-waiting", "finished");
+
+            row.classList.add("incorrect");
+          }
         });
 
         /*
-         * Once the animation is finished, commit the
-         * server totals.
+         * STEP 1
+         *
+         * Wait 1.5 seconds before the
+         * round -> total animation.
          */
-        scoreTransitionEndRef.current = setTimeout(() => {
-          const newTotals = new Map();
+        scoreTransitionStartRef.current = setTimeout(() => {
+          const currentContainer = scoreboardRowsRef.current;
 
-          players.forEach((player) => {
-            const playerId = getPlayerId(player);
+          if (!currentContainer) {
+            return;
+          }
 
-            if (playerId === null) {
-              return;
-            }
+          const currentRows = currentContainer.querySelectorAll(".score-row");
 
-            newTotals.set(
-              String(playerId),
-              getPlayerScore(player),
-            );
+          currentRows.forEach((row) => {
+            row.classList.add("round-complete");
           });
 
-          displayedTotalsRef.current = newTotals;
-          roundScoresRef.current = new Map();
+          /*
+           * STEP 2
+           *
+           * Commit the new totals.
+           *
+           * We deliberately do NOT animate
+           * the position yet.
+           */
+          scoreTransitionEndRef.current = setTimeout(() => {
+            const newTotals = new Map();
 
-          setState((current) => ({
-            ...current,
-            players,
-          }));
+            players.forEach((player) => {
+              const playerId = getPlayerId(player);
 
-          scoreTransitionEndRef.current = null;
-        }, 0);
+              if (playerId === null) {
+                return;
+              }
 
-        scoreTransitionStartRef.current = null;
-      }, 1500);
-    });
-  },
-  [clearTimers, stopMultiAudio],
-);
+              newTotals.set(String(playerId), getPlayerScore(player));
+            });
+
+            displayedTotalsRef.current = newTotals;
+
+            roundScoresRef.current = new Map();
+
+            setState((current) => ({
+              ...current,
+              players,
+            }));
+
+            /*
+             * STEP 3
+             *
+             * Let the total animation
+             * finish first.
+             *
+             * Then trigger the ranking
+             * movement.
+             */
+            scoreTransitionEndRef.current = setTimeout(() => {
+              /*
+               * NOW allow Scoreboard to use the new
+               * ranking order.
+               */
+              setFreezeRanking(false);
+
+              /*
+               * This causes Scoreboard's FLIP animation
+               * to run.
+               */
+              // setAnimatePositions((value) => value + 1);
+
+              scoreTransitionEndRef.current = null;
+            }, 700);
+          }, 0);
+
+          scoreTransitionStartRef.current = null;
+        }, 1500);
+      });
+    },
+    [clearTimers, stopMultiAudio],
+  );
 
   const renderFinal = useCallback(
     (players) => {
@@ -978,83 +1032,81 @@ const Multiplayer = forwardRef(function Multiplayer(
   );
 
   const renderScoreboard = useCallback((players) => {
-  if (!Array.isArray(players)) {
-    return;
-  }
-
-  /*
-   * Update the player data, but DO NOT use the
-   * new server score as the displayed total.
-   *
-   * displayedTotalsRef contains the frozen totals
-   * from the beginning of the round.
-   */
-  setState((current) => ({
-    ...current,
-    players,
-  }));
-
-  requestAnimationFrame(() => {
-    const container = scoreboardRowsRef.current;
-
-    if (!container) {
+    if (!Array.isArray(players)) {
       return;
     }
 
-    const rows = container.querySelectorAll(".score-row");
+    setState((current) => ({
+      ...current,
+      players,
+    }));
 
-    rows.forEach((row) => {
-      const playerId = row.dataset.playerId;
+    /*
+     * The final scoreboard has its own
+     * player list.
+     */
+    if (stateRef.current.finished) {
+      const sorted = [...players].sort(
+        (a, b) => getPlayerScore(b) - getPlayerScore(a),
+      );
 
-      if (!playerId) {
-        return;
-      }
+      setFinalPlayers(sorted);
 
-      const resultElement =
-        row.querySelector(".score-result");
+      const winningPlayer = sorted[0] || null;
 
-      const scoreChange =
-        roundScoresRef.current.get(String(playerId));
+      setWinner(winningPlayer);
 
-      /*
-       * Nobody has answered yet.
-       */
-      if (scoreChange === undefined) {
-        row.classList.add("score-waiting");
+      const winnerId = getPlayerId(winningPlayer);
 
-        row.classList.remove(
-          "finished",
-          "incorrect",
-          "round-complete",
-        );
-
-
-        return;
-      }
-
-      /*
-       * Player has answered.
-       */
-      row.classList.remove("score-waiting");
-
-      /*
-       * Correct answer.
-       */
-      if (scoreChange > 0) {
-        row.classList.add("finished");
-        row.classList.remove("incorrect");
-
+      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+        setWinnerMessage("You win! 🎉");
       } else {
-        /*
-         * Incorrect / too late.
-         */
-        row.classList.add("incorrect");
-        row.classList.remove("finished");
-
+        setWinnerMessage("");
       }
+
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const container = scoreboardRowsRef.current;
+
+      if (!container) {
+        return;
+      }
+
+      const rows = container.querySelectorAll(".score-row");
+
+      rows.forEach((row) => {
+        const playerId = row.dataset.playerId;
+
+        if (!playerId) {
+          return;
+        }
+
+        const scoreChange = roundScoresRef.current.get(String(playerId));
+
+        if (scoreChange === undefined) {
+          row.classList.add("score-waiting");
+
+          row.classList.remove("finished", "incorrect", "round-complete");
+
+          return;
+        }
+
+        row.classList.remove("score-waiting");
+
+        if (scoreChange > 0) {
+          row.classList.add("finished");
+
+          row.classList.remove("incorrect");
+        } else {
+          row.classList.add("incorrect");
+
+          row.classList.remove("finished");
+        }
+      });
     });
-  });
-}, []);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -1111,6 +1163,7 @@ const Multiplayer = forwardRef(function Multiplayer(
 
     const handleAnswerAccepted = (data) => {
       console.log("ANSWER ACCEPTED RECEIVED", data);
+
       if (data?.playerId !== undefined) {
         const playerId = String(data.playerId);
 
@@ -1122,14 +1175,6 @@ const Multiplayer = forwardRef(function Multiplayer(
           ...current,
         }));
 
-        /*
-         * Update the scoreboard immediately.
-         *
-         * 0 points = incorrect /
-         * too late → ✕
-         *
-         * > 0 points = correct → ✓
-         */
         renderScoreboard(stateRef.current.players);
       }
 
@@ -1153,7 +1198,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       stopMultiAudio();
 
-      const players = data?.players || data?.scoreboard || data?.results || [];
+      const players = Array.isArray(data?.players)
+        ? data.players
+        : stateRef.current.players;
 
       renderFinal(players);
     };
@@ -1163,6 +1210,8 @@ const Multiplayer = forwardRef(function Multiplayer(
       setFinalPlayers([]);
       setWinner(null);
       setWinnerMessage("");
+
+      setAnimatePositions(0);
 
       setState((current) => ({
         ...current,
@@ -1456,6 +1505,8 @@ const Multiplayer = forwardRef(function Multiplayer(
             players={state.players}
             roundScores={roundScoresRef.current}
             displayedTotals={displayedTotalsRef.current}
+            animatePositions={animatePositions}
+            freezeRanking={freezeRanking}
           />
         </section>
       )}
