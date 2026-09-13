@@ -641,7 +641,7 @@ function finishCurrentRound(party) {
     ) {
       startNextRound(party);
     }
-  }, 2500);
+  }, 3000);
 }
 
 // ============================================================
