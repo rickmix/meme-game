@@ -342,7 +342,7 @@ const Scoreboard = forwardRef(function Scoreboard(
                 <span className="round-score">
                   {roundScore > 0
                     ? `+${roundScore}`
-                    : "0"}
+                    : ""}
                 </span>
 
                 <strong className="total-score">
