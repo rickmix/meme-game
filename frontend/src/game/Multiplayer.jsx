@@ -583,7 +583,7 @@ const Multiplayer = forwardRef(function Multiplayer(
       const update = () => {
         const currentState = stateRef.current;
 
-        if (!currentState.started || currentState.finished) {
+        if (currentState.finished) {
           return;
         }
 
