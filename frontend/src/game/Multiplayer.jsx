@@ -71,7 +71,11 @@ function getChoiceTitle(choice) {
 
 function getPlayerId(player) {
   return (
-    player?.id ?? player?.socketId ?? player?.playerId ?? player?.userId ?? null
+    player?.id ??
+    player?.socketId ??
+    player?.playerId ??
+    player?.userId ??
+    null
   );
 }
 
@@ -570,7 +574,9 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const timerDuration = Number(duration) || 15;
 
-      const timerStartAt = startAt ? new Date(startAt).getTime() : Date.now();
+      const timerStartAt = startAt
+        ? new Date(startAt).getTime()
+        : Date.now();
 
       const roundEnd = timerStartAt + timerDuration * 1000;
 
@@ -586,14 +592,20 @@ const Multiplayer = forwardRef(function Multiplayer(
         const remaining = Math.max(0, roundEnd - now);
 
         const percentage =
-          timerDuration > 0 ? (remaining / (timerDuration * 1000)) * 100 : 0;
+          timerDuration > 0
+            ? (remaining / (timerDuration * 1000)) * 100
+            : 0;
 
         if (roundProgressRef.current) {
           const progress = roundProgressRef.current;
 
           progress.style.width = `${percentage}%`;
 
-          progress.classList.remove("timer-green", "timer-orange", "timer-red");
+          progress.classList.remove(
+            "timer-green",
+            "timer-orange",
+            "timer-red",
+          );
 
           if (percentage <= 30) {
             progress.classList.add("timer-red");
@@ -625,7 +637,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 return;
               }
 
-              const scoreChange = roundScoresRef.current.get(String(playerId));
+              const scoreChange = roundScoresRef.current.get(
+                String(playerId),
+              );
 
               if (scoreChange === undefined) {
                 row.classList.remove("score-waiting", "finished");
@@ -645,322 +659,73 @@ const Multiplayer = forwardRef(function Multiplayer(
     [submitMultiAnswer],
   );
 
-  const playMultiClip = useCallback(async () => {
-    const audio = audioRef.current;
-
-    if (!audio) {
-      return;
-    }
-
-    try {
-      const current = stateRef.current;
-
-      const start = Number(current.startTime) || 0;
-      const duration = Number(current.audioDuration) || 0;
-
-      audio.currentTime = start;
-
-      await audio.play();
-
-      setState((current) => ({
-        ...current,
-        playing: true,
-      }));
-
-      updateAudioProgress(start, duration);
-    } catch (error) {
-      console.error("Multiplayer audio playback failed:", error);
-
-      setState((current) => ({
-        ...current,
-        playing: false,
-      }));
-    }
-  }, [updateAudioProgress]);
-
-  const startRound = useCallback(
-    (round) => {
-      clearTimers();
-      stopMultiAudio();
-
-      setCountdown(null);
-
-      const audioGeneration = audioGenerationRef.current;
-
-      roundScoresRef.current = new Map();
-      displayedTotalsRef.current = new Map();
-
-      setAnimatePositions(0);
-      setFreezeRanking(false);
-
-      const playersAtRoundStart = stateRef.current.players || [];
-
-      playersAtRoundStart.forEach((player) => {
-        const playerId = getPlayerId(player);
-
-        if (playerId === null) {
-          return;
-        }
-
-        displayedTotalsRef.current.set(
-          String(playerId),
-          getPlayerScore(player),
-        );
-      });
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const container = scoreboardRowsRef.current;
-
-          if (!container) {
-            return;
-          }
-
-          const rows = container.querySelectorAll(".score-row");
-
-          rows.forEach((row) => {
-            row.classList.remove(
-              "score-changed",
-              "finished",
-              "incorrect",
-              "round-complete",
-            );
-
-            row.classList.add("score-waiting");
-
-            const oldPoints = row.querySelector(".round-score-animation");
-
-            if (oldPoints) {
-              oldPoints.remove();
-            }
-          });
-        });
-      });
-
-      const choices = Array.isArray(round?.choices) ? round.choices : [];
-
-      const duration =
-        Number(round?.duration) || Number(round?.roundDuration) || 15;
-
-      const audioDuration =
-        Number(round?.audioDuration) || Number(round?.duration) || 0;
-
-      const startTime = Number(round?.startTime) || 0;
-
-      const startAt = round?.startAt ?? null;
-
-      /*
-       * The server gives us the exact timestamp at which
-       * this round should start.
-       */
-      const startTimestamp = startAt ? new Date(startAt).getTime() : Date.now();
-
-      /*
-       * How long until the official round start?
-       *
-       * If the phone receives the socket event 400 ms later
-       * than the PC, this value will simply be ~400 ms smaller.
-       */
-
-      setState((current) => ({
-        ...current,
-        inParty: true,
-        started: true,
-        finished: false,
-        roundNumber: Number(round?.roundNumber) || current.roundNumber + 1,
-        totalRounds: Number(round?.totalRounds) || current.totalRounds,
-        duration,
-        audioDuration,
-        startTime,
-        startAt,
-        choices,
-        answered: false,
-        selectedAnswerId: null,
-        correctAnswerId: null,
-        timeUp: false,
-        playing: false,
-        answerCorrect: null,
-      }));
-
-      setRoundResults([]);
-
-      onGameActiveChange?.(true);
-
-      /*
-       * Start the timer based on the server timestamp.
-       *
-       * This is safe even if the socket event arrived late.
-       */
-      startAnswerTimer(duration, startAt);
-
+  const playMultiClip = useCallback(
+    async () => {
       const audio = audioRef.current;
 
-      if (!audio || !round?.audioUrl) {
+      if (!audio) {
         return;
       }
 
-      audio.pause();
-
       try {
-        audio.currentTime = 0;
+        const current = stateRef.current;
+
+        const start = Number(current.startTime) || 0;
+        const duration = Number(current.audioDuration) || 0;
+
+        audio.currentTime = start;
+
+        await audio.play();
+
+        setState((current) => ({
+          ...current,
+          playing: true,
+        }));
+
+        updateAudioProgress(start, duration);
       } catch (error) {
-        console.warn(error);
-      }
+        console.error("Multiplayer audio playback failed:", error);
 
-      audio.src = round.audioUrl;
-      audio.load();
-
-      let hasStarted = false;
-
-      const cleanupReadyListener = () => {
-        audio.removeEventListener("canplay", handleReady);
-      };
-
-      const playWhenReady = async () => {
-        if (hasStarted) {
-          return;
-        }
-
-        if (audioGenerationRef.current !== audioGeneration) {
-          cleanupReadyListener();
-          return;
-        }
-
-        /*
-         * Recalculate this every time.
-         *
-         * This is important on phones because loading the audio
-         * can take an unpredictable amount of time.
-         */
-        const remainingUntilStart = startTimestamp - Date.now();
-
-        if (remainingUntilStart > 0) {
-          clearTimeout(countdownTimerRef.current);
-
-          countdownTimerRef.current = setTimeout(
-            playWhenReady,
-            remainingUntilStart,
-          );
-
-          return;
-        }
-
-        hasStarted = true;
-
-        if (audioGenerationRef.current !== audioGeneration) {
-          return;
-        }
-
-        try {
-          audio.currentTime = startTime;
-
-          await audio.play();
-
-          if (audioGenerationRef.current !== audioGeneration) {
-            audio.pause();
-            return;
-          }
-
-          setState((current) => ({
-            ...current,
-            playing: true,
-          }));
-
-          updateAudioProgress(startTime, audioDuration);
-
-          if (audioDuration > 0) {
-            clearTimeout(clipTimerRef.current);
-
-            /*
-             * Don't use the time from when audio.play()
-             * happened as the source of truth.
-             *
-             * The server start time remains authoritative.
-             */
-            const audioEndAt = startTimestamp + audioDuration * 1000;
-
-            const stopAudio = () => {
-              if (audioGenerationRef.current !== audioGeneration) {
-                return;
-              }
-
-              stopMultiAudio();
-            };
-
-            const remainingAudioTime = Math.max(0, audioEndAt - Date.now());
-
-            clipTimerRef.current = setTimeout(stopAudio, remainingAudioTime);
-          }
-        } catch (error) {
-          hasStarted = false;
-
-          console.error("Multiplayer audio playback failed:", error);
-
-          setState((current) => ({
-            ...current,
-            playing: false,
-          }));
-        }
-      };
-
-      const handleReady = () => {
-        cleanupReadyListener();
-        playWhenReady();
-      };
-
-      /*
-       * Audio is already loaded.
-       */
-      if (audio.readyState >= 3) {
-        playWhenReady();
-      } else {
-        audio.addEventListener("canplay", handleReady);
+        setState((current) => ({
+          ...current,
+          playing: false,
+        }));
       }
     },
-    [
-      clearTimers,
-      onGameActiveChange,
-      startAnswerTimer,
-      stopMultiAudio,
-      updateAudioProgress,
-    ],
+    [updateAudioProgress],
   );
-  const finishRound = useCallback(
-    (data) => {
-      clearTimers();
-      stopMultiAudio();
 
-      const currentRound = Number(stateRef.current.roundNumber) || 0;
-      const totalRounds = Number(stateRef.current.totalRounds) || 0;
+  const startRound = useCallback(
+  (round) => {
+    clearTimers();
+    stopMultiAudio();
 
-      const isLastRound = totalRounds > 0 && currentRound >= totalRounds;
+    setCountdown(null);
 
-      if (isLastRound) {
-        setCountdown(null);
-      } else {
-        setCountdown(3);
+    const audioGeneration = audioGenerationRef.current;
+
+    roundScoresRef.current = new Map();
+    displayedTotalsRef.current = new Map();
+
+    setAnimatePositions(0);
+    setFreezeRanking(false);
+
+    const playersAtRoundStart = stateRef.current.players || [];
+
+    playersAtRoundStart.forEach((player) => {
+      const playerId = getPlayerId(player);
+
+      if (playerId === null) {
+        return;
       }
 
-      setAnimatePositions(0);
-      setFreezeRanking(true);
+      displayedTotalsRef.current.set(
+        String(playerId),
+        getPlayerScore(player),
+      );
+    });
 
-      const correctAnswerId = data?.answerId ?? null;
-
-      const results = Array.isArray(data?.results) ? data.results : [];
-
-      const players = Array.isArray(data?.players) ? data.players : [];
-
-      setRoundResults(results);
-
-      setState((current) => ({
-        ...current,
-        started: true,
-        answered: true,
-        playing: false,
-        correctAnswerId,
-        players,
-      }));
-
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const container = scoreboardRowsRef.current;
 
@@ -971,67 +736,370 @@ const Multiplayer = forwardRef(function Multiplayer(
         const rows = container.querySelectorAll(".score-row");
 
         rows.forEach((row) => {
-          const playerId = row.dataset.playerId;
+          row.classList.remove(
+            "score-changed",
+            "finished",
+            "incorrect",
+            "round-complete",
+          );
 
-          if (!playerId) {
-            return;
-          }
+          row.classList.add("score-waiting");
 
-          const scoreChange = roundScoresRef.current.get(String(playerId));
+          const oldPoints = row.querySelector(
+            ".round-score-animation",
+          );
 
-          if (scoreChange === undefined) {
-            row.classList.remove("score-waiting", "finished");
-            row.classList.add("incorrect");
+          if (oldPoints) {
+            oldPoints.remove();
           }
         });
+      });
+    });
 
-        scoreTransitionStartRef.current = setTimeout(() => {
-          const currentContainer = scoreboardRowsRef.current;
+    const choices = Array.isArray(round?.choices)
+      ? round.choices
+      : [];
 
-          if (!currentContainer) {
-            return;
-          }
+    const duration =
+      Number(round?.duration) ||
+      Number(round?.roundDuration) ||
+      15;
 
-          const currentRows = currentContainer.querySelectorAll(".score-row");
+    const audioDuration =
+      Number(round?.audioDuration) ||
+      Number(round?.duration) ||
+      0;
 
-          currentRows.forEach((row) => {
-            row.classList.add("round-complete");
+    const startTime = Number(round?.startTime) || 0;
+
+    const startAt = round?.startAt ?? null;
+
+    /*
+     * The server gives us the exact timestamp at which
+     * this round should start.
+     */
+    const startTimestamp = startAt
+      ? new Date(startAt).getTime()
+      : Date.now();
+
+    /*
+     * How long until the official round start?
+     *
+     * If the phone receives the socket event 400 ms later
+     * than the PC, this value will simply be ~400 ms smaller.
+     */
+    const waitUntilStart = Math.max(
+      0,
+      startTimestamp - Date.now(),
+    );
+
+    setState((current) => ({
+      ...current,
+      inParty: true,
+      started: true,
+      finished: false,
+      roundNumber:
+        Number(round?.roundNumber) ||
+        current.roundNumber + 1,
+      totalRounds:
+        Number(round?.totalRounds) ||
+        current.totalRounds,
+      duration,
+      audioDuration,
+      startTime,
+      startAt,
+      choices,
+      answered: false,
+      selectedAnswerId: null,
+      correctAnswerId: null,
+      timeUp: false,
+      playing: false,
+      answerCorrect: null,
+    }));
+
+    setRoundResults([]);
+
+    onGameActiveChange?.(true);
+
+    /*
+     * Start the timer based on the server timestamp.
+     *
+     * This is safe even if the socket event arrived late.
+     */
+    startAnswerTimer(duration, startAt);
+
+    const audio = audioRef.current;
+
+    if (!audio || !round?.audioUrl) {
+      return;
+    }
+
+    audio.pause();
+
+    try {
+      audio.currentTime = 0;
+    } catch (error) {
+      console.warn(error);
+    }
+
+    audio.src = round.audioUrl;
+    audio.load();
+
+    let hasStarted = false;
+
+    const cleanupReadyListener = () => {
+      audio.removeEventListener("canplay", handleReady);
+    };
+
+    const playWhenReady = async () => {
+      if (hasStarted) {
+        return;
+      }
+
+      if (audioGenerationRef.current !== audioGeneration) {
+        cleanupReadyListener();
+        return;
+      }
+
+      /*
+       * Recalculate this every time.
+       *
+       * This is important on phones because loading the audio
+       * can take an unpredictable amount of time.
+       */
+      const remainingUntilStart =
+        startTimestamp - Date.now();
+
+      if (remainingUntilStart > 0) {
+        clearTimeout(countdownTimerRef.current);
+
+        countdownTimerRef.current = setTimeout(
+          playWhenReady,
+          remainingUntilStart,
+        );
+
+        return;
+      }
+
+      hasStarted = true;
+
+      if (audioGenerationRef.current !== audioGeneration) {
+        return;
+      }
+
+      try {
+        audio.currentTime = startTime;
+
+        await audio.play();
+
+        if (
+          audioGenerationRef.current !==
+          audioGeneration
+        ) {
+          audio.pause();
+          return;
+        }
+
+        setState((current) => ({
+          ...current,
+          playing: true,
+        }));
+
+        updateAudioProgress(
+          startTime,
+          audioDuration,
+        );
+
+        if (audioDuration > 0) {
+          clearTimeout(clipTimerRef.current);
+
+          /*
+           * Don't use the time from when audio.play()
+           * happened as the source of truth.
+           *
+           * The server start time remains authoritative.
+           */
+          const audioEndAt =
+            startTimestamp +
+            audioDuration * 1000;
+
+          const stopAudio = () => {
+            if (
+              audioGenerationRef.current !==
+              audioGeneration
+            ) {
+              return;
+            }
+
+            stopMultiAudio();
+          };
+
+          const remainingAudioTime =
+            Math.max(0, audioEndAt - Date.now());
+
+          clipTimerRef.current = setTimeout(
+            stopAudio,
+            remainingAudioTime,
+          );
+        }
+      } catch (error) {
+        hasStarted = false;
+
+        console.error(
+          "Multiplayer audio playback failed:",
+          error,
+        );
+
+        setState((current) => ({
+          ...current,
+          playing: false,
+        }));
+      }
+    };
+
+    const handleReady = () => {
+      cleanupReadyListener();
+      playWhenReady();
+    };
+
+    /*
+     * Audio is already loaded.
+     */
+    if (audio.readyState >= 3) {
+      playWhenReady();
+    } else {
+      audio.addEventListener(
+        "canplay",
+        handleReady,
+      );
+    }
+  },
+  [
+    clearTimers,
+    onGameActiveChange,
+    startAnswerTimer,
+    stopMultiAudio,
+    updateAudioProgress,
+  ],
+);
+  const finishRound = useCallback(
+  (data) => {
+    clearTimers();
+    stopMultiAudio();
+
+    const currentRound = Number(stateRef.current.roundNumber) || 0;
+    const totalRounds = Number(stateRef.current.totalRounds) || 0;
+
+    const isLastRound =
+      totalRounds > 0 && currentRound >= totalRounds;
+
+    if (isLastRound) {
+      setCountdown(null);
+    } else {
+      setCountdown(3);
+    }
+
+    setAnimatePositions(0);
+    setFreezeRanking(true);
+
+    const correctAnswerId = data?.answerId ?? null;
+
+    const results = Array.isArray(data?.results)
+      ? data.results
+      : [];
+
+    const players = Array.isArray(data?.players)
+      ? data.players
+      : [];
+
+    setRoundResults(results);
+
+    setState((current) => ({
+      ...current,
+      started: true,
+      answered: true,
+      playing: false,
+      correctAnswerId,
+      players,
+    }));
+
+    requestAnimationFrame(() => {
+      const container = scoreboardRowsRef.current;
+
+      if (!container) {
+        return;
+      }
+
+      const rows = container.querySelectorAll(".score-row");
+
+      rows.forEach((row) => {
+        const playerId = row.dataset.playerId;
+
+        if (!playerId) {
+          return;
+        }
+
+        const scoreChange = roundScoresRef.current.get(
+          String(playerId),
+        );
+
+        if (scoreChange === undefined) {
+          row.classList.remove("score-waiting", "finished");
+          row.classList.add("incorrect");
+        }
+      });
+
+      scoreTransitionStartRef.current = setTimeout(() => {
+        const currentContainer = scoreboardRowsRef.current;
+
+        if (!currentContainer) {
+          return;
+        }
+
+        const currentRows =
+          currentContainer.querySelectorAll(".score-row");
+
+        currentRows.forEach((row) => {
+          row.classList.add("round-complete");
+        });
+
+        scoreTransitionEndRef.current = setTimeout(() => {
+          const newTotals = new Map();
+
+          players.forEach((player) => {
+            const playerId = getPlayerId(player);
+
+            if (playerId === null) {
+              return;
+            }
+
+            newTotals.set(
+              String(playerId),
+              getPlayerScore(player),
+            );
           });
 
+          displayedTotalsRef.current = newTotals;
+          roundScoresRef.current = new Map();
+
+          setState((current) => ({
+            ...current,
+            players,
+          }));
+
           scoreTransitionEndRef.current = setTimeout(() => {
-            const newTotals = new Map();
+            setFreezeRanking(false);
 
-            players.forEach((player) => {
-              const playerId = getPlayerId(player);
+            scoreTransitionEndRef.current = null;
+          }, 700);
+        }, 0);
 
-              if (playerId === null) {
-                return;
-              }
-
-              newTotals.set(String(playerId), getPlayerScore(player));
-            });
-
-            displayedTotalsRef.current = newTotals;
-            roundScoresRef.current = new Map();
-
-            setState((current) => ({
-              ...current,
-              players,
-            }));
-
-            scoreTransitionEndRef.current = setTimeout(() => {
-              setFreezeRanking(false);
-
-              scoreTransitionEndRef.current = null;
-            }, 700);
-          }, 0);
-
-          scoreTransitionStartRef.current = null;
-        }, 1500);
-      });
-    },
-    [clearTimers, stopMultiAudio],
-  );
+        scoreTransitionStartRef.current = null;
+      }, 1500);
+    });
+  },
+  [clearTimers, stopMultiAudio],
+);
 
   const renderFinal = useCallback(
     (players) => {
@@ -1044,7 +1112,9 @@ const Multiplayer = forwardRef(function Multiplayer(
       setCountdown(null);
 
       const sorted = Array.isArray(players)
-        ? [...players].sort((a, b) => getPlayerScore(b) - getPlayerScore(a))
+        ? [...players].sort(
+            (a, b) => getPlayerScore(b) - getPlayerScore(a),
+          )
         : [];
 
       setFinalPlayers(sorted);
@@ -1055,7 +1125,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const winnerId = getPlayerId(winningPlayer);
 
-      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+      if (
+        winnerId !== null &&
+        String(winnerId) === String(socket.id)
+      ) {
         setWinnerMessage("You win! 🎉");
 
         confetti();
@@ -1105,7 +1178,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const winnerId = getPlayerId(winningPlayer);
 
-      if (winnerId !== null && String(winnerId) === String(socket.id)) {
+      if (
+        winnerId !== null &&
+        String(winnerId) === String(socket.id)
+      ) {
         setWinnerMessage("You win! 🎉");
       } else {
         setWinnerMessage("");
@@ -1130,12 +1206,18 @@ const Multiplayer = forwardRef(function Multiplayer(
           return;
         }
 
-        const scoreChange = roundScoresRef.current.get(String(playerId));
+        const scoreChange = roundScoresRef.current.get(
+          String(playerId),
+        );
 
         if (scoreChange === undefined) {
           row.classList.add("score-waiting");
 
-          row.classList.remove("finished", "incorrect", "round-complete");
+          row.classList.remove(
+            "finished",
+            "incorrect",
+            "round-complete",
+          );
 
           return;
         }
@@ -1257,11 +1339,12 @@ const Multiplayer = forwardRef(function Multiplayer(
       setWinnerMessage("");
 
       setAnimatePositions(0);
+      setFreezeRanking(false);
 
       setState((current) => ({
         ...current,
         finished: false,
-        started: false,
+        started: true,
         answered: false,
         selectedAnswerId: null,
         correctAnswerId: null,
@@ -1270,12 +1353,14 @@ const Multiplayer = forwardRef(function Multiplayer(
         answerCorrect: null,
       }));
 
-      applyParty(data?.party || data);
+      onGameActiveChange?.(true);
     };
 
     const handlePartyError = (data) => {
       setSetupError(
-        typeof data === "string" ? data : data?.message || "Party error.",
+        typeof data === "string"
+          ? data
+          : data?.message || "Party error.",
       );
     };
 
@@ -1339,7 +1424,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 type="text"
                 placeholder="Your name"
                 value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
+                onChange={(event) =>
+                  setCreateName(event.target.value)
+                }
                 maxLength={20}
               />
 
@@ -1347,7 +1434,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 id="roundCount"
                 className="multi-select"
                 value={roundCount}
-                onChange={(event) => setRoundCount(event.target.value)}
+                onChange={(event) =>
+                  setRoundCount(event.target.value)
+                }
               >
                 <option value="5">5 rounds</option>
                 <option value="10">10 rounds</option>
@@ -1375,7 +1464,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 type="text"
                 placeholder="Your name"
                 value={joinName}
-                onChange={(event) => setJoinName(event.target.value)}
+                onChange={(event) =>
+                  setJoinName(event.target.value)
+                }
                 maxLength={20}
               />
 
@@ -1385,7 +1476,9 @@ const Multiplayer = forwardRef(function Multiplayer(
                 placeholder="Party code"
                 value={partyCodeInput}
                 onChange={(event) =>
-                  setPartyCodeInput(event.target.value.toUpperCase())
+                  setPartyCodeInput(
+                    event.target.value.toUpperCase(),
+                  )
                 }
                 maxLength={6}
               />
@@ -1423,7 +1516,11 @@ const Multiplayer = forwardRef(function Multiplayer(
           />
         )}
 
-      <audio ref={audioRef} id="multiAudio" preload="auto" />
+      <audio
+        ref={audioRef}
+        id="multiAudio"
+        preload="auto"
+      />
 
       {state.started && (
         <section id="multiGame">
@@ -1444,9 +1541,13 @@ const Multiplayer = forwardRef(function Multiplayer(
 
                 <h2>Next round</h2>
 
-                <div className="countdown-number">{countdown}</div>
+                <div className="countdown-number">
+                  {countdown}
+                </div>
 
-                <p className="muted">Get ready...</p>
+                <p className="muted">
+                  Get ready...
+                </p>
               </div>
             ) : (
               <>
@@ -1475,7 +1576,10 @@ const Multiplayer = forwardRef(function Multiplayer(
                   </button>
 
                   <div className="bar">
-                    <div ref={multiProgressRef} id="multiProgress" />
+                    <div
+                      ref={multiProgressRef}
+                      id="multiProgress"
+                    />
                   </div>
 
                   <span id="multiDuration">
@@ -1483,20 +1587,26 @@ const Multiplayer = forwardRef(function Multiplayer(
                   </span>
                 </div>
 
-                <div id="multiChoices" className="multi-choices">
+                <div
+                  id="multiChoices"
+                  className="multi-choices"
+                >
                   {state.choices.map((choice, index) => {
                     const choiceId = getChoiceId(choice);
 
                     const isSelected =
                       state.selectedAnswerId !== null &&
-                      String(state.selectedAnswerId) === String(choiceId);
+                      String(state.selectedAnswerId) ===
+                        String(choiceId);
 
                     const isCorrectChoice =
                       state.correctAnswerId !== null &&
-                      String(state.correctAnswerId) === String(choiceId);
+                      String(state.correctAnswerId) ===
+                        String(choiceId);
 
                     const isImmediatelyCorrect =
-                      state.answerCorrect === true && isSelected;
+                      state.answerCorrect === true &&
+                      isSelected;
 
                     const isWrongSelectedChoice =
                       state.answerCorrect === false &&
@@ -1505,7 +1615,10 @@ const Multiplayer = forwardRef(function Multiplayer(
 
                     let choiceClass = "choice-button";
 
-                    if (isCorrectChoice || isImmediatelyCorrect) {
+                    if (
+                      isCorrectChoice ||
+                      isImmediatelyCorrect
+                    ) {
                       choiceClass += " correct";
                     } else if (isWrongSelectedChoice) {
                       choiceClass += " incorrect";
@@ -1519,17 +1632,26 @@ const Multiplayer = forwardRef(function Multiplayer(
                         type="button"
                         className={choiceClass}
                         disabled={isDisabled}
-                        onClick={() => submitMultiAnswer(choiceId)}
+                        onClick={() =>
+                          submitMultiAnswer(choiceId)
+                        }
                       >
-                        <span className="choice-number">{index + 1}</span>
+                        <span className="choice-number">
+                          {index + 1}
+                        </span>
 
                         <span className="choice-title">
                           {getChoiceTitle(choice)}
                         </span>
 
-                        {isSelected && state.answerCorrect !== null && (
-                          <span>{state.answerCorrect ? "✓" : "✕"}</span>
-                        )}
+                        {isSelected &&
+                          state.answerCorrect !== null && (
+                            <span>
+                              {state.answerCorrect
+                                ? "✓"
+                                : "✕"}
+                            </span>
+                          )}
                       </button>
                     );
                   })}
@@ -1550,18 +1672,30 @@ const Multiplayer = forwardRef(function Multiplayer(
       )}
 
       {isFinal && (
-        <section id="multiFinalResult" className="card game-card">
+        <section
+          id="multiFinalResult"
+          className="card game-card"
+        >
           <h2>Game finished!</h2>
 
           {winnerMessage && (
-            <div className="winner-message">{winnerMessage}</div>
+            <div className="winner-message">
+              {winnerMessage}
+            </div>
           )}
 
-          <div id="finalScoreboard" className="scoreboard">
+          <div
+            id="finalScoreboard"
+            className="scoreboard"
+          >
             {finalPlayers.map((player, index) => (
               <div
-                className={`score-row ${index === 0 ? "leader" : ""}`}
-                key={String(getPlayerId(player) ?? index)}
+                className={`score-row ${
+                  index === 0 ? "leader" : ""
+                }`}
+                key={String(
+                  getPlayerId(player) ?? index,
+                )}
               >
                 <span>{index + 1}</span>
 
