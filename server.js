@@ -479,37 +479,51 @@ async function startNextRound(party) {
     party.totalRounds
   ) {
     finishPartyGame(party);
-
     return;
   }
 
   try {
     const round =
-      await createMultiplayerRound(
-        party,
-      );
+      await createMultiplayerRound(party);
+
+    /*
+     * One official start timestamp for EVERY player.
+     *
+     * Give clients a little time to receive the
+     * roundStarted event and prepare the audio.
+     */
+    const startAt =
+      Date.now() + 1000;
 
     party.currentRound = round;
 
-    party.roundStartedAt =
-      Date.now();
+    party.roundStartedAt = startAt;
 
     party.roundEndsAt =
-      Date.now() +
-      ROUND_DURATION;
+      startAt + ROUND_DURATION;
 
     for (
       const player of
       party.players.values()
     ) {
       player.answered = false;
-
       player.currentRoundPoints = 0;
     }
 
+    /*
+     * Send the exact same startAt to everyone.
+     */
     io.to(party.code).emit(
       "roundStarted",
-      round,
+      {
+        ...round,
+        startAt: new Date(
+          startAt,
+        ).toISOString(),
+
+        duration:
+          ROUND_DURATION / 1000,
+      },
     );
 
     if (party.roundTimer) {
@@ -518,10 +532,20 @@ async function startNextRound(party) {
       );
     }
 
+    /*
+     * Server also uses the exact same timestamp.
+     */
+    const remaining =
+      Math.max(
+        0,
+        party.roundEndsAt -
+          Date.now(),
+      );
+
     party.roundTimer =
       setTimeout(() => {
         finishCurrentRound(party);
-      }, ROUND_DURATION);
+      }, remaining);
   } catch (error) {
     console.error(
       "Could not start multiplayer round:",
