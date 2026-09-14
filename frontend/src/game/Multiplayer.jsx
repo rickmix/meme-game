@@ -71,7 +71,11 @@ function getChoiceTitle(choice) {
 
 function getPlayerId(player) {
   return (
-    player?.id ?? player?.socketId ?? player?.playerId ?? player?.userId ?? null
+    player?.id ??
+    player?.socketId ??
+    player?.playerId ??
+    player?.userId ??
+    null
   );
 }
 
@@ -137,6 +141,14 @@ const Multiplayer = forwardRef(function Multiplayer(
   const [winner, setWinner] = useState(null);
   const [winnerMessage, setWinnerMessage] = useState("");
 
+  /*
+   * Countdown shown between rounds.
+   *
+   * null = no countdown
+   * 3, 2, 1 = countdown visible
+   */
+  const [countdown, setCountdown] = useState(null);
+
   const [animatePositions, setAnimatePositions] = useState(0);
   const [freezeRanking, setFreezeRanking] = useState(false);
 
@@ -173,6 +185,40 @@ const Multiplayer = forwardRef(function Multiplayer(
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  /*
+   * Between-round countdown.
+   *
+   * This is deliberately NOT connected to state.finished.
+   *
+   * It starts when a round finishes and disappears as soon as
+   * the server sends the next roundStarted event.
+   */
+  useEffect(() => {
+    if (countdown === null) {
+      return;
+    }
+
+    if (countdown <= 1) {
+      const timer = setTimeout(() => {
+        setCountdown(null);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((current) => {
+        if (current === null || current <= 1) {
+          return null;
+        }
+
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const clearTimers = useCallback(() => {
     clearTimeout(clipTimerRef.current);
@@ -247,6 +293,8 @@ const Multiplayer = forwardRef(function Multiplayer(
     clearTimers();
 
     audioGenerationRef.current += 1;
+
+    setCountdown(null);
 
     const audio = audioRef.current;
 
@@ -606,12 +654,6 @@ const Multiplayer = forwardRef(function Multiplayer(
         timerRef.current = setTimeout(update, 50);
       };
 
-      /*
-       * The state has been scheduled as started, but the timer should
-       * not depend on waiting for the next React render.
-       *
-       * Give React one frame so the DOM progress element is available.
-       */
       requestAnimationFrame(update);
     },
     [submitMultiAnswer],
@@ -658,6 +700,13 @@ const Multiplayer = forwardRef(function Multiplayer(
       clearTimers();
 
       stopMultiAudio();
+
+      /*
+       * The next round has arrived.
+       *
+       * Hide the between-round countdown immediately.
+       */
+      setCountdown(null);
 
       /*
        * stopMultiAudio() increments the generation.
@@ -735,9 +784,6 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       const startAt = round?.startAt ?? null;
 
-      /*
-       * Store the round information first.
-       */
       setState((current) => ({
         ...current,
         inParty: true,
@@ -766,17 +812,8 @@ const Multiplayer = forwardRef(function Multiplayer(
 
       onGameActiveChange?.(true);
 
-      /*
-       * Start the timer using the round values directly.
-       *
-       * This fixes the first-round timer race.
-       */
       startAnswerTimer(duration, startAt);
 
-      /*
-       * The audio element is always mounted now, so this ref exists
-       * even on the first round.
-       */
       const audio = audioRef.current;
 
       if (!audio || !round?.audioUrl) {
@@ -838,9 +875,6 @@ const Multiplayer = forwardRef(function Multiplayer(
 
           audio.currentTime = startTime;
 
-          /*
-           * Only mark playing after play() succeeds.
-           */
           await audio.play();
 
           if (audioGenerationRef.current !== audioGeneration) {
@@ -872,12 +906,6 @@ const Multiplayer = forwardRef(function Multiplayer(
         } catch (error) {
           hasStarted = false;
 
-          /*
-           * NotAllowedError normally means the browser blocked
-           * script-initiated autoplay.
-           *
-           * We leave the Play button available in that case.
-           */
           console.error(
             "Multiplayer audio playback failed:",
             error,
@@ -895,10 +923,6 @@ const Multiplayer = forwardRef(function Multiplayer(
         playWhenReady();
       };
 
-      /*
-       * canplay means the browser has enough data to begin
-       * playback. If it is already ready, start immediately.
-       */
       if (audio.readyState >= 3) {
         playWhenReady();
       } else {
@@ -915,114 +939,134 @@ const Multiplayer = forwardRef(function Multiplayer(
   );
 
   const finishRound = useCallback(
-    (data) => {
-      clearTimers();
-      stopMultiAudio();
+  (data) => {
+    clearTimers();
+    stopMultiAudio();
 
-      setAnimatePositions(0);
-      setFreezeRanking(true);
+    const currentRound = Number(stateRef.current.roundNumber) || 0;
+    const totalRounds = Number(stateRef.current.totalRounds) || 0;
 
-      const correctAnswerId = data?.answerId ?? null;
+    const isLastRound =
+      totalRounds > 0 && currentRound >= totalRounds;
 
-      const results = Array.isArray(data?.results)
-        ? data.results
-        : [];
+    if (isLastRound) {
+      setCountdown(null);
+    } else {
+      setCountdown(3);
+    }
 
-      const players = Array.isArray(data?.players)
-        ? data.players
-        : [];
+    setAnimatePositions(0);
+    setFreezeRanking(true);
 
-      setRoundResults(results);
+    const correctAnswerId = data?.answerId ?? null;
 
-      setState((current) => ({
-        ...current,
-        started: true,
-        answered: true,
-        playing: false,
-        correctAnswerId,
-        players,
-      }));
+    const results = Array.isArray(data?.results)
+      ? data.results
+      : [];
 
-      requestAnimationFrame(() => {
-        const container = scoreboardRowsRef.current;
+    const players = Array.isArray(data?.players)
+      ? data.players
+      : [];
 
-        if (!container) {
+    setRoundResults(results);
+
+    setState((current) => ({
+      ...current,
+      started: true,
+      answered: true,
+      playing: false,
+      correctAnswerId,
+      players,
+    }));
+
+    requestAnimationFrame(() => {
+      const container = scoreboardRowsRef.current;
+
+      if (!container) {
+        return;
+      }
+
+      const rows = container.querySelectorAll(".score-row");
+
+      rows.forEach((row) => {
+        const playerId = row.dataset.playerId;
+
+        if (!playerId) {
           return;
         }
 
-        const rows = container.querySelectorAll(".score-row");
+        const scoreChange = roundScoresRef.current.get(
+          String(playerId),
+        );
 
-        rows.forEach((row) => {
-          const playerId = row.dataset.playerId;
+        if (scoreChange === undefined) {
+          row.classList.remove("score-waiting", "finished");
+          row.classList.add("incorrect");
+        }
+      });
 
-          if (!playerId) {
-            return;
-          }
+      scoreTransitionStartRef.current = setTimeout(() => {
+        const currentContainer = scoreboardRowsRef.current;
 
-          const scoreChange = roundScoresRef.current.get(
-            String(playerId),
-          );
+        if (!currentContainer) {
+          return;
+        }
 
-          if (scoreChange === undefined) {
-            row.classList.remove("score-waiting", "finished");
-            row.classList.add("incorrect");
-          }
+        const currentRows =
+          currentContainer.querySelectorAll(".score-row");
+
+        currentRows.forEach((row) => {
+          row.classList.add("round-complete");
         });
 
-        scoreTransitionStartRef.current = setTimeout(() => {
-          const currentContainer = scoreboardRowsRef.current;
+        scoreTransitionEndRef.current = setTimeout(() => {
+          const newTotals = new Map();
 
-          if (!currentContainer) {
-            return;
-          }
+          players.forEach((player) => {
+            const playerId = getPlayerId(player);
 
-          const currentRows =
-            currentContainer.querySelectorAll(".score-row");
+            if (playerId === null) {
+              return;
+            }
 
-          currentRows.forEach((row) => {
-            row.classList.add("round-complete");
+            newTotals.set(
+              String(playerId),
+              getPlayerScore(player),
+            );
           });
 
+          displayedTotalsRef.current = newTotals;
+          roundScoresRef.current = new Map();
+
+          setState((current) => ({
+            ...current,
+            players,
+          }));
+
           scoreTransitionEndRef.current = setTimeout(() => {
-            const newTotals = new Map();
+            setFreezeRanking(false);
 
-            players.forEach((player) => {
-              const playerId = getPlayerId(player);
+            scoreTransitionEndRef.current = null;
+          }, 700);
+        }, 0);
 
-              if (playerId === null) {
-                return;
-              }
-
-              newTotals.set(
-                String(playerId),
-                getPlayerScore(player),
-              );
-            });
-
-            displayedTotalsRef.current = newTotals;
-            roundScoresRef.current = new Map();
-
-            setState((current) => ({
-              ...current,
-              players,
-            }));
-
-            scoreTransitionEndRef.current = setTimeout(() => {
-              setFreezeRanking(false);
-
-              scoreTransitionEndRef.current = null;
-            }, 700);
-          }, 0);
-
-          scoreTransitionStartRef.current = null;
-        }, 1500);
-      });
-    },
-    [clearTimers, stopMultiAudio],
-  );
+        scoreTransitionStartRef.current = null;
+      }, 1500);
+    });
+  },
+  [clearTimers, stopMultiAudio],
+);
 
   const renderFinal = useCallback(
     (players) => {
+      /*
+       * The game itself is now finished.
+       *
+       * Cancel any between-round countdown because there is
+       * no next round.
+       */
+      setCountdown(null);
+
       const sorted = Array.isArray(players)
         ? [...players].sort(
             (a, b) => getPlayerScore(b) - getPlayerScore(a),
@@ -1243,6 +1287,8 @@ const Multiplayer = forwardRef(function Multiplayer(
     };
 
     const handleNewGameStarted = (data) => {
+      setCountdown(null);
+
       setRoundResults([]);
       setFinalPlayers([]);
       setWinner(null);
@@ -1425,14 +1471,6 @@ const Multiplayer = forwardRef(function Multiplayer(
           />
         )}
 
-      {/*
-       * IMPORTANT:
-       *
-       * Audio is deliberately outside the state.started conditional.
-       *
-       * This means the audio element already exists when the first
-       * roundStarted socket event arrives.
-       */}
       <audio
         ref={audioRef}
         id="multiAudio"
@@ -1452,109 +1490,129 @@ const Multiplayer = forwardRef(function Multiplayer(
           </div>
 
           <div className="card game-card">
-            <div className="sound-icon">🔊</div>
+            {countdown !== null && !state.finished ? (
+              <div className="round-countdown">
+                <div className="sound-icon">⏱️</div>
 
-            <h2>Which video is this?</h2>
+                <h2>Next round</h2>
 
-            <p className="muted">
-              Listen to the clip and choose the video.
-            </p>
+                <div className="countdown-number">
+                  {countdown}
+                </div>
 
-            <div className="player">
-              <button
-                id="multiPlayBtn"
-                className="play"
-                type="button"
-                onClick={() => {
-                  if (state.playing) {
-                    stopMultiAudio();
-                  } else {
-                    playMultiClip();
-                  }
-                }}
-              >
-                {state.playing ? "❚❚" : "▶"}
-              </button>
-
-              <div className="bar">
-                <div
-                  ref={multiProgressRef}
-                  id="multiProgress"
-                />
+                <p className="muted">
+                  Get ready...
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="sound-icon">🔊</div>
 
-              <span id="multiDuration">
-                {formatSeconds(state.audioDuration)}s
-              </span>
-            </div>
+                <h2>Which video is this?</h2>
 
-            <div
-              id="multiChoices"
-              className="multi-choices"
-            >
-              {state.choices.map((choice, index) => {
-                const choiceId = getChoiceId(choice);
+                <p className="muted">
+                  Listen to the clip and choose the video.
+                </p>
 
-                const isSelected =
-                  state.selectedAnswerId !== null &&
-                  String(state.selectedAnswerId) ===
-                    String(choiceId);
-
-                const isCorrectChoice =
-                  state.correctAnswerId !== null &&
-                  String(state.correctAnswerId) ===
-                    String(choiceId);
-
-                const isImmediatelyCorrect =
-                  state.answerCorrect === true &&
-                  isSelected;
-
-                const isWrongSelectedChoice =
-                  state.answerCorrect === false &&
-                  isSelected &&
-                  !isCorrectChoice;
-
-                let choiceClass = "choice-button";
-
-                if (
-                  isCorrectChoice ||
-                  isImmediatelyCorrect
-                ) {
-                  choiceClass += " correct";
-                } else if (isWrongSelectedChoice) {
-                  choiceClass += " incorrect";
-                }
-
-                const isDisabled = state.answered;
-
-                return (
+                <div className="player">
                   <button
-                    key={String(choiceId ?? index)}
+                    id="multiPlayBtn"
+                    className="play"
                     type="button"
-                    className={choiceClass}
-                    disabled={isDisabled}
-                    onClick={() =>
-                      submitMultiAnswer(choiceId)
-                    }
+                    onClick={() => {
+                      if (state.playing) {
+                        stopMultiAudio();
+                      } else {
+                        playMultiClip();
+                      }
+                    }}
                   >
-                    <span className="choice-number">
-                      {index + 1}
-                    </span>
-
-                    <span className="choice-title">
-                      {getChoiceTitle(choice)}
-                    </span>
-
-                    {isSelected &&
-                      state.answerCorrect !== null && (
-                        <span>
-                          {state.answerCorrect ? "✓" : "✕"}
-                        </span>
-                      )}
+                    {state.playing ? "❚❚" : "▶"}
                   </button>
-                );
-              })}
-            </div>
+
+                  <div className="bar">
+                    <div
+                      ref={multiProgressRef}
+                      id="multiProgress"
+                    />
+                  </div>
+
+                  <span id="multiDuration">
+                    {formatSeconds(state.audioDuration)}s
+                  </span>
+                </div>
+
+                <div
+                  id="multiChoices"
+                  className="multi-choices"
+                >
+                  {state.choices.map((choice, index) => {
+                    const choiceId = getChoiceId(choice);
+
+                    const isSelected =
+                      state.selectedAnswerId !== null &&
+                      String(state.selectedAnswerId) ===
+                        String(choiceId);
+
+                    const isCorrectChoice =
+                      state.correctAnswerId !== null &&
+                      String(state.correctAnswerId) ===
+                        String(choiceId);
+
+                    const isImmediatelyCorrect =
+                      state.answerCorrect === true &&
+                      isSelected;
+
+                    const isWrongSelectedChoice =
+                      state.answerCorrect === false &&
+                      isSelected &&
+                      !isCorrectChoice;
+
+                    let choiceClass = "choice-button";
+
+                    if (
+                      isCorrectChoice ||
+                      isImmediatelyCorrect
+                    ) {
+                      choiceClass += " correct";
+                    } else if (isWrongSelectedChoice) {
+                      choiceClass += " incorrect";
+                    }
+
+                    const isDisabled = state.answered;
+
+                    return (
+                      <button
+                        key={String(choiceId ?? index)}
+                        type="button"
+                        className={choiceClass}
+                        disabled={isDisabled}
+                        onClick={() =>
+                          submitMultiAnswer(choiceId)
+                        }
+                      >
+                        <span className="choice-number">
+                          {index + 1}
+                        </span>
+
+                        <span className="choice-title">
+                          {getChoiceTitle(choice)}
+                        </span>
+
+                        {isSelected &&
+                          state.answerCorrect !== null && (
+                            <span>
+                              {state.answerCorrect
+                                ? "✓"
+                                : "✕"}
+                            </span>
+                          )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           <Scoreboard

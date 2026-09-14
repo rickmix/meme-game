@@ -298,11 +298,7 @@ form .primary {
   margin: 0 auto 22px;
   border-radius: 50%;
 
-  background: linear-gradient(
-    145deg,
-    #30394d,
-    #1d2432
-  );
+  background: linear-gradient(145deg, #30394d, #1d2432);
 
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 35px;
@@ -752,11 +748,7 @@ form .primary {
 
   -webkit-tap-highlight-color: transparent;
 
-  background: linear-gradient(
-    145deg,
-    #1c2230,
-    #171c27
-  );
+  background: linear-gradient(145deg, #1c2230, #171c27);
 
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
@@ -783,11 +775,7 @@ form .primary {
   .choice-button:hover {
     transform: translateY(-2px);
 
-    background: linear-gradient(
-      145deg,
-      #282f40,
-      #202735
-    );
+    background: linear-gradient(145deg, #282f40, #202735);
 
     border-color: rgba(255, 255, 255, 0.15);
   }
@@ -938,7 +926,7 @@ form .primary {
 
   min-height: 48px;
   padding: 12px 10px;
-  
+
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
 
@@ -968,18 +956,9 @@ form .primary {
   align-items: center;
   gap: 10px;
 
-  transform:
-    translateY(
-      var(--score-move-y, 0px)
-    );
+  transform: translateY(var(--score-move-y, 0px));
 
-  transition:
-    transform 0.9s cubic-bezier(
-      0.16,
-      1,
-      0.3,
-      1
-    );
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 
   will-change: transform;
 }
@@ -1016,15 +995,9 @@ form .primary {
 .score-row.leader {
   width: 100%;
 
-  background: linear-gradient(
-    145deg,
-    #292438,
-    #211d30
-  );
+  background: linear-gradient(145deg, #292438, #211d30);
 
-  box-shadow:
-    0 0 20px
-    rgba(255, 215, 80, 0.16);
+  box-shadow: 0 0 20px rgba(255, 215, 80, 0.16);
 
   padding: 20px 50px;
 }
@@ -1034,19 +1007,13 @@ form .primary {
   font-size: 1.15em;
 }
 
-.score-row.leader
-  .score-player-content
-  > span:first-child {
+.score-row.leader .score-player-content > span:first-child {
   font-size: 1.15em;
   font-weight: bold;
 }
 
-.score-row.leader
-  .score-player-content
-  .round-score,
-.score-row.leader
-  .score-player-content
-  .total-score {
+.score-row.leader .score-player-content .round-score,
+.score-row.leader .score-player-content .total-score {
   font-size: 1.12em;
 }
 
@@ -1152,16 +1119,13 @@ form .primary {
    Round finished animation
    ---------------------------------------------------------- */
 
-.score-row.round-complete
-  .round-score {
+.score-row.round-complete .round-score {
   opacity: 0;
   transform: translateX(18px);
 }
 
-.score-row.round-complete
-  .total-score {
-  animation:
-    totalScoreReveal 0.55s ease-out;
+.score-row.round-complete .total-score {
+  animation: totalScoreReveal 0.55s ease-out;
 }
 
 /* ==========================================================
@@ -1349,6 +1313,32 @@ form .primary {
   opacity: 1 !important;
 }
 
+.round-countdown {
+  min-height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.countdown-number {
+  font-size: 96px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 25px 0;
+  animation: countdownPop 0.9s ease;
+}
+@keyframes countdownPop {
+  0% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* ==========================================================
    FINAL SCOREBOARD
    ========================================================== */
@@ -1459,7 +1449,7 @@ form .primary {
 
   .player-row {
     grid-template-columns:
-      36px
+      50%
       minmax(0, 1fr)
       auto;
 
@@ -1581,9 +1571,7 @@ form .primary {
     font-size: 1em;
   }
 
-  .score-row.leader
-    .score-player-content
-    > span:first-child {
+  .score-row.leader .score-player-content > span:first-child {
     font-size: 1em;
   }
 
@@ -1592,12 +1580,8 @@ form .primary {
     font-size: 14px;
   }
 
-  .score-row.leader
-    .score-player-content
-    .round-score,
-  .score-row.leader
-    .score-player-content
-    .total-score {
+  .score-row.leader .score-player-content .round-score,
+  .score-row.leader .score-player-content .total-score {
     font-size: 16px;
   }
 
@@ -1720,12 +1704,8 @@ form .primary {
     font-size: 13px;
   }
 
-  .score-row.leader
-    .score-player-content
-    .round-score,
-  .score-row.leader
-    .score-player-content
-    .total-score {
+  .score-row.leader .score-player-content .round-score,
+  .score-row.leader .score-player-content .total-score {
     font-size: 14px;
   }
 }
