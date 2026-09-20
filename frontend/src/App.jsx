@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import SinglePlayer from "./game/SinglePlayer.jsx";
 import Multiplayer from "./game/Multiplayer.jsx";
@@ -29,6 +29,36 @@ function Game() {
   const singlePlayerRef = useRef(null);
 
   const multiplayerRef = useRef(null);
+
+  // =========================================================
+  // THEME
+  // =========================================================
+
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem("theme");
+
+    return savedTheme === "dark" ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((currentTheme) =>
+      currentTheme === "dark" ? "light" : "dark",
+    );
+  }
+
+  // =========================================================
+  // GAME MODE
+  // =========================================================
 
   function switchToSingle() {
     if (mode === "multi") {
@@ -80,6 +110,24 @@ function Game() {
 
           <h1>Meme master 3000</h1>
         </div>
+
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-label={
+            theme === "dark"
+              ? "Switch to light theme"
+              : "Switch to dark theme"
+          }
+          title={
+            theme === "dark"
+              ? "Switch to light theme"
+              : "Switch to dark theme"
+          }
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
       </header>
 
       <div className="tabs">
